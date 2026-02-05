@@ -1,0 +1,26 @@
+/.env
+/.idea
+/vendor
+
+# IDE / Editor
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# PHP
+*.log
+.phpunit.result.cache
+phpunit.xml
+coverage/
+.phan/
+
+# Build / cache (if you add these later)
+/var/
+/tmp/
+/temp/
+*.cache
+
+# OS
+.DS_Store
+Thumbs.db
