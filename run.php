@@ -7,7 +7,7 @@ use GuzzleHttp\Psr7\ServerRequest;
 use GuzzleHttp\Psr7\Uri;
 use Slim\Factory\AppFactory;
 
-require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/bootstrap.php';
 
 // Build PHP-DI container
 $containerBuilder = new ContainerBuilder();

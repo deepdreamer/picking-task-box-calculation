@@ -4,7 +4,7 @@ use App\Bootstrap\RouteLoader;
 use DI\ContainerBuilder;
 use Slim\Factory\AppFactory;
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/../bootstrap.php';
 
 // Build PHP-DI container
 $containerBuilder = new ContainerBuilder();

@@ -3,6 +3,7 @@
 - `docker-compose up -d`
 - `docker-compose run shipmonk-packing-app bash`
 - `composer install && bin/doctrine orm:schema-tool:create && bin/doctrine dbal:run-sql "$(cat data/packaging-data.sql)"`
+- `php bin/setup-test-db.php`
 
 ### run
 - `php run.php "$(cat sample.json)"`

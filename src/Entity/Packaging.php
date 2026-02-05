@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Repository\PackagingRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -10,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
  *
  * Warehouse workers pack a set of products for a given order into one of these boxes.
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: PackagingRepository::class)]
 class Packaging
 {
 
@@ -39,4 +40,28 @@ class Packaging
         $this->maxWeight = $maxWeight;
     }
 
+    public function getId(): ?int
+    {
+        return $this->id;
+    }
+
+    public function getWidth(): float
+    {
+        return $this->width;
+    }
+
+    public function getHeight(): float
+    {
+        return $this->height;
+    }
+
+    public function getLength(): float
+    {
+        return $this->length;
+    }
+
+    public function getMaxWeight(): float
+    {
+        return $this->maxWeight;
+    }
 }

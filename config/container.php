@@ -1,6 +1,10 @@
 <?php
 
 use App\Controllers\PackController;
+use App\Entity\Packaging;
+use App\Repository\PackagingRepository;
+use App\Services\InputValidator;
+use App\Services\PackingService;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
@@ -12,6 +16,9 @@ use Psr\Container\ContainerInterface;
 $dbConfig = require __DIR__ . '/database.php';
 
 return [
+    PackagingRepository::class => function (ContainerInterface $container) {
+        return $container->get(EntityManager::class)->getRepository(Packaging::class);
+    },
     Connection::class => function () use ($dbConfig) {
         return DriverManager::getConnection($dbConfig['connection_params']);
     },
@@ -32,10 +39,22 @@ return [
     Client::class => function () {
         return new Client();
     },
+    InputValidator::class => function () {
+        return new InputValidator();
+    },
     PackController::class => function (ContainerInterface $container) {
         return new PackController(
-            $container->get(EntityManager::class),
-            $container->get(Client::class)
+            $container->get(PackingService::class),
+            $container->get(InputValidator::class),
+        );
+    },
+    PackingService::class => function (ContainerInterface $container) {
+        return new PackingService(
+            $_ENV['API_URL'],
+            $_ENV['API_KEY'],
+            $_ENV['API_USERNAME'],
+            $container->get(Client::class),
+            $container->get(EntityManager::class)->getRepository(Packaging::class)
         );
     }
 ];

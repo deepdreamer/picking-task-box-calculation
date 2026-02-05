@@ -1,11 +1,17 @@
 #!/usr/bin/env php
 <?php
 
+use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use Doctrine\ORM\Tools\Console\EntityManagerProvider\SingleManagerProvider;
+use DI\ContainerBuilder;
 
-$entityManager = require __DIR__ . '/../src/bootstrap.php';
+require __DIR__ . '/../bootstrap.php';
+
+$containerBuilder = new ContainerBuilder();
+$containerBuilder->addDefinitions(__DIR__ . '/../config/container.php');
+$container = $containerBuilder->build();
 
 ConsoleRunner::run(
-    new SingleManagerProvider($entityManager)
+    new SingleManagerProvider($container->get(EntityManager::class))
 );

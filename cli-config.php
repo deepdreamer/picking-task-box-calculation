@@ -5,7 +5,7 @@ use Doctrine\ORM\Tools\Console\ConsoleRunner;
 use DI\ContainerBuilder;
 use Doctrine\ORM\Tools\Console\EntityManagerProvider\SingleManagerProvider;
 
-require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/bootstrap.php';
 
 $containerBuilder = new ContainerBuilder();
 $containerBuilder->addDefinitions(__DIR__ . '/config/container.php');
