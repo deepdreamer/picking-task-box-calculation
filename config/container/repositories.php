@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Entity\Packaging;
 use App\Entity\PackerResponseCache;
 use App\Repository\PackagingRepository;

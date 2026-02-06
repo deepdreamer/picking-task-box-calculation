@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Services;
 
 use App\Entity\Packaging;
@@ -67,7 +69,12 @@ class PackingService
                 $binData = $this->getFromApiAndCacheResponse($items, $requestHash); // load new packaging
 
                 if (!empty($binData)) {
-                    $packingFromDb = $this->packagingRepository->find($binData['id']);
+                    if (count($binData) > 1) {
+                        throw new CannotFitInOneBinException();
+                    }
+
+                    $firstBin = $binData[0]; // always only one bin
+                    $packingFromDb = $this->packagingRepository->find($firstBin['id']);
                 }
             }
         }
@@ -89,17 +96,17 @@ class PackingService
      */
     private function determineOptimalPackagingLocally(array $availablePackaging, array $items): ?Packaging
     {
-        $binData = $this->localPackagingCalculator->calculateOptimalBin(
+        $smallestSufficientBin = $this->localPackagingCalculator->calculateOptimalBin(
             $availablePackaging,
             $items
         );
 
-        if (empty($binData)) {
+        if (empty($smallestSufficientBin)) {
             return null;
         }
 
         /** @var Packaging $packingFromDb */
-        $packingFromDb = $this->packagingRepository->find($binData['id']);
+        $packingFromDb = $this->packagingRepository->find($smallestSufficientBin['id']);
 
         return $packingFromDb;
     }
@@ -127,16 +134,15 @@ class PackingService
                 $binsPacked = $response['bins_packed'];
                 $binData = $binsPacked[0]['bin_data'];
 
-                if (count($binData) > 1) {
-                    throw new CannotFitInOneBinException();
-                }
-
                 $this->entityManager->persist(new PackerResponseCache($requestHash, json_encode($binData)));
                 $this->entityManager->flush();
 
                 return $binData;
             } else {
-                $this->logger->error('Third party api error', ['exception' => $response]);
+                $this->logger->error('Third party api error', [
+                    'status_code' => $response->getStatusCode(),
+                    'response_body' => (string) $response->getBody(),
+                ]);
             }
         } catch (GuzzleException $e) {
             $this->logger->error('Packing service error', ['exception' => $e]);
@@ -153,7 +159,9 @@ class PackingService
     {
         $packings = $this->packagingRepository->findAll();
         if (empty($packings)) {
-            throw new NoPackagingInDatabaseException();
+            $e = new NoPackagingInDatabaseException();
+            $this->logger->error('No packaging found in database', ['exception' => $e]);
+            throw $e;
         }
 
         return array_map(

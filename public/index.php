@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Bootstrap\RouteLoader;
 use DI\ContainerBuilder;
 use Psr\Log\LoggerInterface;
