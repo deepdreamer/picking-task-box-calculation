@@ -7,7 +7,7 @@ use Doctrine\DBAL\DriverManager;
 return [
     // Database connection parameters for Doctrine DBAL
     'connection_params' => [
-        'driver' => $_ENV['DB_DRIVER'] ?? 'pdo_mysql',
+        'driver' => (($_ENV['DB_DRIVER'] ?? 'pdo_mysql') === 'mysqli') ? 'mysqli' : 'pdo_mysql',
         'port' => $_ENV['DB_PORT'] ?? 3306,
         'charset' => $_ENV['DB_CHARSET'] ?? 'utf8mb4',
         'host' => $_ENV['DB_HOST'] ?? 'shipmonk-packing-mysql',

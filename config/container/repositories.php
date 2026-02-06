@@ -11,9 +11,17 @@ use Psr\Container\ContainerInterface;
 
 return [
     PackagingRepository::class => function (ContainerInterface $container) {
-        return $container->get(EntityManager::class)->getRepository(Packaging::class);
+        /** @var EntityManager $em */
+        $em = $container->get(EntityManager::class);
+        /** @var PackagingRepository $repository */
+        $repository = $em->getRepository(Packaging::class);
+        return $repository;
     },
     PackerResponseCacheRepository::class => function (ContainerInterface $container) {
-        return $container->get(EntityManager::class)->getRepository(PackerResponseCache::class);
+        /** @var EntityManager $em */
+        $em = $container->get(EntityManager::class);
+        /** @var PackerResponseCacheRepository $repository */
+        $repository = $em->getRepository(PackerResponseCache::class);
+        return $repository;
     },
 ];

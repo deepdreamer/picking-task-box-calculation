@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Entity\Packaging;
+use App\Repository\PackagingRepository;
 use App\Repository\PackerResponseCacheRepository;
 use App\Services\InputValidator;
 use App\Services\LocalPackagingCalculator;
@@ -25,16 +26,36 @@ return [
         return new OutputFormatter();
     },
     PackingService::class => function (ContainerInterface $container) {
+        /** @var EntityManager $em */
+        $em = $container->get(EntityManager::class);
+        /** @var PackagingRepository $packagingRepo */
+        $packagingRepo = $em->getRepository(Packaging::class);
+        /** @var Client $client */
+        $client = $container->get(Client::class);
+        /** @var LoggerInterface $logger */
+        $logger = $container->get(LoggerInterface::class);
+        /** @var PackerResponseCacheRepository $cacheRepo */
+        $cacheRepo = $container->get(PackerResponseCacheRepository::class);
+        /** @var EntityManagerInterface $entityManager */
+        $entityManager = $container->get(EntityManagerInterface::class);
+        /** @var LocalPackagingCalculator $localCalc */
+        $localCalc = $container->get(LocalPackagingCalculator::class);
+        $apiUrl = $_ENV['API_URL'] ?? '';
+        $apiKey = $_ENV['API_KEY'] ?? '';
+        $apiUsername = $_ENV['API_USERNAME'] ?? '';
+        $apiUrl = is_string($apiUrl) ? $apiUrl : '';
+        $apiKey = is_string($apiKey) ? $apiKey : '';
+        $apiUsername = is_string($apiUsername) ? $apiUsername : '';
         return new PackingService(
-            $_ENV['API_URL'],
-            $_ENV['API_KEY'],
-            $_ENV['API_USERNAME'],
-            $container->get(Client::class),
-            $container->get(EntityManager::class)->getRepository(Packaging::class),
-            $container->get(LoggerInterface::class),
-            $container->get(PackerResponseCacheRepository::class),
-            $container->get(EntityManagerInterface::class),
-            $container->get(LocalPackagingCalculator::class),
+            $apiUrl,
+            $apiKey,
+            $apiUsername,
+            $client,
+            $packagingRepo,
+            $logger,
+            $cacheRepo,
+            $entityManager,
+            $localCalc,
         );
     },
 ];

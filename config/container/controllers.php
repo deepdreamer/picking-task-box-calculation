@@ -11,11 +11,14 @@ use Psr\Log\LoggerInterface;
 
 return [
     PackController::class => function (ContainerInterface $container) {
-        return new PackController(
-            $container->get(PackingService::class),
-            $container->get(InputValidator::class),
-            $container->get(OutputFormatter::class),
-            $container->get(LoggerInterface::class),
-        );
+        /** @var PackingService $service */
+        $service = $container->get(PackingService::class);
+        /** @var InputValidator $inputValidator */
+        $inputValidator = $container->get(InputValidator::class);
+        /** @var OutputFormatter $outputFormatter */
+        $outputFormatter = $container->get(OutputFormatter::class);
+        /** @var LoggerInterface $logger */
+        $logger = $container->get(LoggerInterface::class);
+        return new PackController($service, $inputValidator, $outputFormatter, $logger);
     },
 ];

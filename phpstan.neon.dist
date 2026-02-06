@@ -1,0 +1,15 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+
+parameters:
+    level: max
+    paths:
+        - src
+        - config
+        - bootstrap.php
+        - cli-config.php
+        - migrations.php
+        - run.php
+        - public/index.php
+    excludePaths:
+        - tests/*

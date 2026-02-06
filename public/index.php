@@ -23,11 +23,13 @@ RouteLoader::load($app);
 $env = $_ENV['APP_ENV'] ?? 'dev';
 $isProd = $env === 'prod';
 
+/** @var LoggerInterface $logger */
+$logger = $container->get(LoggerInterface::class);
 $errorMiddleware = $app->addErrorMiddleware(
     !$isProd,  // displayErrorDetails: true in dev, false in prod
     true,      // logErrors
     true,      // logErrorDetails
-    $container->get(LoggerInterface::class)
+    $logger
 );
 
 

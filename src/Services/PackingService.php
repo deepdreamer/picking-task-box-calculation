@@ -37,8 +37,7 @@ class PackingService
     }
 
     /**
-     * @param array $products
-     * @return Packaging
+     * @param list<array{width: int, height: int, length: int, weight: int}> $products
      * @throws CannotFitInOneBinException
      * @throws NoAppropriatePackagingFoundException
      * @throws NoPackagingInDatabaseException
@@ -50,15 +49,18 @@ class PackingService
     {
         $items = $this->canonicalizeItems($this->prepareProducts($products));
         $canonizedItemsString = json_encode($items, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        $requestHash = hash('sha256', $canonizedItemsString);
+        $requestHash = hash('sha256', $canonizedItemsString !== false ? $canonizedItemsString : '');
         $cached = $this->packerResponseCacheRepository->findByRequestHash($requestHash);
         if ($cached !== null) {
             $binData = json_decode($cached->responseBody, true);
+            $binData = is_array($binData) ? $binData : [];
         } else {
             $binData = $this->getFromApiAndCacheResponse($items, $requestHash);
         }
 
-        if (!empty($binData)) {
+        $packingFromDb = null;
+        if ($binData !== []) {
+            /** @var array{id: int|string} $binData */
             $packingFromDb = $this->packagingRepository->find($binData['id']);
             if ($packingFromDb === null) { // packaging no longer supported
                 if ($cached !== null) { // clear cache
@@ -68,13 +70,9 @@ class PackingService
 
                 $binData = $this->getFromApiAndCacheResponse($items, $requestHash); // load new packaging
 
-                if (!empty($binData)) {
-                    if (count($binData) > 1) {
-                        throw new CannotFitInOneBinException();
-                    }
-
-                    $firstBin = $binData[0]; // always only one bin
-                    $packingFromDb = $this->packagingRepository->find($firstBin['id']);
+                if ($binData !== []) {
+                    /** @var array{id: int|string} $binData */
+                    $packingFromDb = $this->packagingRepository->find($binData['id']);
                 }
             }
         }
@@ -89,6 +87,8 @@ class PackingService
     }
 
     /**
+     * @param list<array{id: int|string, h: float, w: float, d: float, max_wg: float, type?: string}> $availablePackaging
+     * @param array<int, array{id: string, w: int|float, h: int|float, d: int|float, q: int, wg: int|float, vr?: int}> $items
      * @throws TotalItemsDimensionsException
      * @throws CannotFitInOneBinException
      * @throws NonPositiveItemWeightException
@@ -101,21 +101,24 @@ class PackingService
             $items
         );
 
-        if (empty($smallestSufficientBin)) {
+        if ($smallestSufficientBin === []) {
             return null;
         }
 
-        /** @var Packaging $packingFromDb */
+        /** @var array{id: int|string} $smallestSufficientBin */
+        /** @var Packaging|null $packingFromDb */
         $packingFromDb = $this->packagingRepository->find($smallestSufficientBin['id']);
 
         return $packingFromDb;
     }
 
     /**
+     * @param array<int, array{id: string, w: int, h: int, d: int, q: int, wg: int, vr: int}> $items
+     * @return array<string, mixed>
      * @throws NoPackagingInDatabaseException
      * @throws CannotFitInOneBinException
      */
-    private function getFromApiAndCacheResponse($items, $requestHash): array
+    private function getFromApiAndCacheResponse(array $items, string $requestHash): array
     {
         try {
             $response = $this->client->post("$this->apiUrl/packer/pack", [
@@ -129,21 +132,33 @@ class PackingService
 
             if ($response->getStatusCode() === 200) {
                 $body = json_decode($response->getBody()->getContents(), true);
-
-                $response = $body['response'];
-                $binsPacked = $response['bins_packed'];
+                if (!is_array($body)) {
+                    return [];
+                }
+                $responseData = $body['response'] ?? [];
+                if (!is_array($responseData) || !isset($responseData['bins_packed']) || !is_array($responseData['bins_packed'])) {
+                    return [];
+                }
+                $binsPacked = $responseData['bins_packed'];
+                if (!isset($binsPacked[0]) || !is_array($binsPacked[0]) || !isset($binsPacked[0]['bin_data'])) {
+                    return [];
+                }
                 $binData = $binsPacked[0]['bin_data'];
-
-                $this->entityManager->persist(new PackerResponseCache($requestHash, json_encode($binData)));
+                if (!is_array($binData)) {
+                    return [];
+                }
+                /** @var array<string, mixed> $binData */
+                $encoded = json_encode($binData);
+                $this->entityManager->persist(new PackerResponseCache($requestHash, $encoded !== false ? $encoded : ''));
                 $this->entityManager->flush();
 
                 return $binData;
-            } else {
-                $this->logger->error('Third party api error', [
-                    'status_code' => $response->getStatusCode(),
-                    'response_body' => (string) $response->getBody(),
-                ]);
             }
+
+            $this->logger->error('Third party api error', [
+                'status_code' => $response->getStatusCode(),
+                'response_body' => (string) $response->getBody(),
+            ]);
         } catch (GuzzleException $e) {
             $this->logger->error('Packing service error', ['exception' => $e]);
         }
@@ -152,13 +167,13 @@ class PackingService
     }
 
     /**
-     * @return array<int, array{id: string, h: float, w: float, d: float, wg: string, max_wg: float, q: null, cost: int, type: string}>
+     * @return list<array{id: string, h: float, w: float, d: float, max_wg: float, type: string}>
      * @throws NoPackagingInDatabaseException
      */
     private function getAvailablePackaging(): array
     {
         $packings = $this->packagingRepository->findAll();
-        if (empty($packings)) {
+        if ($packings === []) {
             $e = new NoPackagingInDatabaseException();
             $this->logger->error('No packaging found in database', ['exception' => $e]);
             throw $e;
@@ -171,12 +186,12 @@ class PackingService
     }
 
     /**
-     * @return array{id: string, h: float, w: float, d: float, wg: string, max_wg: float, q: null, cost: int, type: string}
+     * @return array{id: string, h: float, w: float, d: float, max_wg: float, type: string}
      */
     private function packagingToBin(Packaging $packaging): array
     {
         return [
-            'id' => $packaging->id,
+            'id' => $packaging->id !== null ? (string) $packaging->id : '',
             'h' => $packaging->height,
             'w' => $packaging->width,
             'd' => $packaging->length,
@@ -206,14 +221,16 @@ class PackingService
         );
     }
 
+    /**
+     * @param list<array{id: string, w: int, h: int, d: int, q: int, wg: int, vr: int}> $items
+     * @return array<int, array{id: string, w: int, h: int, d: int, q: int, wg: int, vr: int}>
+     */
     private function canonicalizeItems(array $items): array
     {
         ksort($items, SORT_STRING);
 
         foreach ($items as &$value) {
-            if (is_array($value)) {
-                ksort($value, SORT_STRING);
-            }
+            ksort($value, SORT_STRING);
         }
 
         return $items;

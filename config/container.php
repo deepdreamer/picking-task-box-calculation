@@ -17,11 +17,17 @@ declare(strict_types=1);
 
 $containerDir = __DIR__ . '/container';
 
-return array_merge(
-    require $containerDir . '/doctrine.php',
-    require $containerDir . '/repositories.php',
-    require $containerDir . '/logging.php',
-    require $containerDir . '/http.php',
-    require $containerDir . '/services.php',
-    require $containerDir . '/controllers.php'
-);
+/** @var array<string, mixed> $doctrine */
+$doctrine = require $containerDir . '/doctrine.php';
+/** @var array<string, mixed> $repositories */
+$repositories = require $containerDir . '/repositories.php';
+/** @var array<string, mixed> $logging */
+$logging = require $containerDir . '/logging.php';
+/** @var array<string, mixed> $http */
+$http = require $containerDir . '/http.php';
+/** @var array<string, mixed> $services */
+$services = require $containerDir . '/services.php';
+/** @var array<string, mixed> $controllers */
+$controllers = require $containerDir . '/controllers.php';
+
+return array_merge($doctrine, $repositories, $logging, $http, $services, $controllers);

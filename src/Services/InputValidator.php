@@ -47,11 +47,19 @@ class InputValidator
                 );
             }
 
+            /** @var int $width */
+            $width = $item['width'];
+            /** @var int $height */
+            $height = $item['height'];
+            /** @var int $length */
+            $length = $item['length'];
+            /** @var int $weight */
+            $weight = $item['weight'];
             $products[] = [
-                'width' => $item['width'],
-                'height' => $item['height'],
-                'length' => $item['length'],
-                'weight' => $item['weight'],
+                'width' => $width,
+                'height' => $height,
+                'length' => $length,
+                'weight' => $weight,
             ];
         }
 

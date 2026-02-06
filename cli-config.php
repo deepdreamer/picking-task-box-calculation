@@ -13,7 +13,9 @@ $containerBuilder = new ContainerBuilder();
 $containerBuilder->addDefinitions(__DIR__ . '/config/container.php');
 $container = $containerBuilder->build();
 
+/** @var EntityManager $entityManager */
+$entityManager = $container->get(EntityManager::class);
 ConsoleRunner::run(
-    new SingleManagerProvider($container->get(EntityManager::class))
+    new SingleManagerProvider($entityManager)
 );
 

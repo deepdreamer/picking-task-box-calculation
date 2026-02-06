@@ -20,6 +20,11 @@ class PackerResponseCache
         }
     }
 
+    public function getRequestHash(): string
+    {
+        return $this->requestHash;
+    }
+
     #[ORM\Column(type: Types::TEXT)]
     public string $responseBody {
         get {
@@ -32,6 +37,11 @@ class PackerResponseCache
         get {
             return $this->createdAt;
         }
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
     }
 
     public function __construct(string $requestHash, string $responseBody)

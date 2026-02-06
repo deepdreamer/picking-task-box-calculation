@@ -34,7 +34,7 @@ class PackController
         } catch (CannotFitInOneBinException | NoAppropriatePackagingFoundException $e) {
             $this->logger->error('Failed to find appropriate packaging for products', ['exception' => $e]);
             $body = json_encode(['error' => $e->getMessage()]);
-            $response->getBody()->write($body);
+            $response->getBody()->write($body !== false ? $body : '{}');
             return $response->withStatus(422)->withHeader('Content-Type', 'application/json');
         }
 
