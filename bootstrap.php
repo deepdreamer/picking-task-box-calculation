@@ -1,11 +1,11 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * Central bootstrap: loads autoloader and populates env from .env
  * Include this first in any entry point (web, CLI, tests)
  */
+
+declare(strict_types=1);
 
 use Symfony\Component\Dotenv\Dotenv;
 

@@ -18,9 +18,9 @@ class LocalPackagingCalculator
     /**
      * Selects the smallest bin that can fit all items by total volume and weight.
      *
-     * @param list<array{id: int|string, h: float, w: float, d: float, max_wg: float, type?: string}> $bins Available packagings (same format as PackingService::getAvailablePackings)
-     * @param array<int, array{id: string, w: int|float, h: int|float, d: int|float, q: int, wg: int|float, vr?: int}> $items Items to pack (same format as prepared/canonicalized items)
-     * @return array{id: int|string}|array{} Bin data with 'id' of the chosen packaging, or empty array if none fits
+     * @param list<array{id: int|string, h: float, w: float, d: float, max_wg: float, type?: string}> $bins Available packagings
+     * @param array<int, array{id: string, w: int|float, h: int|float, d: int|float, q: int, wg: int|float, vr?: int}> $items Items to pack
+     * @return array{id: int|string}|array{} Bin data with 'id' of the chosen packaging, or empty if none fits
      * @throws CannotFitInOneBinException
      * @throws NonPositiveItemVolumeException
      * @throws NonPositiveItemWeightException
@@ -63,7 +63,6 @@ class LocalPackagingCalculator
             if ($volume <= 0.0) {
                 throw new NonPositiveItemVolumeException();
             }
-
         }
         return $volume;
     }

@@ -31,9 +31,7 @@ class PackingService
         private PackerResponseCacheRepository $packerResponseCacheRepository,
         private EntityManagerInterface $entityManager,
         private LocalPackagingCalculator $localPackagingCalculator
-    )
-    {
-
+    ) {
     }
 
     /**
@@ -77,7 +75,10 @@ class PackingService
             }
         }
 
-        $packingFromDb = $packingFromDb ?? $this->determineOptimalPackagingLocally($this->getAvailablePackaging(), $items);
+        $packingFromDb = $packingFromDb ?? $this->determineOptimalPackagingLocally(
+            $this->getAvailablePackaging(),
+            $items
+        );
 
         if ($packingFromDb !== null) {
             return $packingFromDb;
@@ -136,11 +137,19 @@ class PackingService
                     return [];
                 }
                 $responseData = $body['response'] ?? [];
-                if (!is_array($responseData) || !isset($responseData['bins_packed']) || !is_array($responseData['bins_packed'])) {
+                if (
+                    !is_array($responseData)
+                    || !isset($responseData['bins_packed'])
+                    || !is_array($responseData['bins_packed'])
+                ) {
                     return [];
                 }
                 $binsPacked = $responseData['bins_packed'];
-                if (!isset($binsPacked[0]) || !is_array($binsPacked[0]) || !isset($binsPacked[0]['bin_data'])) {
+                if (
+                    !isset($binsPacked[0])
+                    || !is_array($binsPacked[0])
+                    || !isset($binsPacked[0]['bin_data'])
+                ) {
                     return [];
                 }
                 $binData = $binsPacked[0]['bin_data'];
@@ -149,7 +158,9 @@ class PackingService
                 }
                 /** @var array<string, mixed> $binData */
                 $encoded = json_encode($binData);
-                $this->entityManager->persist(new PackerResponseCache($requestHash, $encoded !== false ? $encoded : ''));
+                $this->entityManager->persist(
+                    new PackerResponseCache($requestHash, $encoded !== false ? $encoded : '')
+                );
                 $this->entityManager->flush();
 
                 return $binData;
@@ -180,7 +191,7 @@ class PackingService
         }
 
         return array_map(
-            fn(Packaging $packaging) => $this->packagingToBin($packaging),
+            fn (Packaging $packaging) => $this->packagingToBin($packaging),
             $packings
         );
     }

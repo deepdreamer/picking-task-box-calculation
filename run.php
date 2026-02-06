@@ -22,7 +22,12 @@ $app = AppFactory::create();
 
 RouteLoader::load($app);
 
-$request = new ServerRequest('POST', new Uri('http://localhost/pack'), ['Content-Type' => 'application/json'], $argv[1] ?? '{}');
+$request = new ServerRequest(
+    'POST',
+    new Uri('http://localhost/pack'),
+    ['Content-Type' => 'application/json'],
+    $argv[1] ?? '{}'
+);
 $response = $app->handle($request);
 
 echo "<<< In:\n" . Message::toString($request) . "\n\n";

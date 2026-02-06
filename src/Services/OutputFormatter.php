@@ -11,7 +11,8 @@ class OutputFormatter
     /**
      * Formats the optimal packaging as a structured array for JSON output.
      *
-     * @return array{success: true, box: array{id: int|null, width: float, height: float, length: float, max_weight: float, dimensions: string}}
+     * @return array{success: true, box: array{id: int|null, width: float, height: float,
+     *                length: float, max_weight: float, dimensions: string}}
      */
     public function format(Packaging $packaging): array
     {

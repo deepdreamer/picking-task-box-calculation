@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /**
  * Application container definitions.
  *
@@ -14,6 +12,8 @@ declare(strict_types=1);
  * - container/services.php — Application services (validators, domain services)
  * - container/controllers.php — HTTP controllers
  */
+
+declare(strict_types=1);
 
 $containerDir = __DIR__ . '/container';
 

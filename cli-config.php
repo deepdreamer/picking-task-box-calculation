@@ -18,4 +18,3 @@ $entityManager = $container->get(EntityManager::class);
 ConsoleRunner::run(
     new SingleManagerProvider($entityManager)
 );
-
