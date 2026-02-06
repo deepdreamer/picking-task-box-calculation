@@ -4,9 +4,14 @@ namespace App\Services;
 
 use App\Entity\Packaging;
 use App\Entity\PackerResponseCache;
+use App\Services\Exception\CannotFitInOneBinException;
+use App\Services\Exception\NoAppropriatePackagingFoundException;
+use App\Services\Exception\NonPositiveItemVolumeException;
+use App\Services\Exception\NonPositiveItemWeightException;
+use App\Services\Exception\NoPackagingInDatabaseException;
 use App\Repository\PackagingRepository;
-use App\Services\LocalPackagingCalculator;
 use App\Repository\PackerResponseCacheRepository;
+use App\Services\Exception\TotalItemsDimensionsException;
 use Doctrine\ORM\EntityManagerInterface;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -30,7 +35,14 @@ class PackingService
     }
 
     /**
-     * @throws \Exception
+     * @param array $products
+     * @return Packaging
+     * @throws CannotFitInOneBinException
+     * @throws NoAppropriatePackagingFoundException
+     * @throws NoPackagingInDatabaseException
+     * @throws NonPositiveItemVolumeException
+     * @throws NonPositiveItemWeightException
+     * @throws TotalItemsDimensionsException
      */
     public function getOptimalBox(array $products): Packaging
     {
@@ -46,51 +58,62 @@ class PackingService
 
         if (!empty($binData)) {
             $packingFromDb = $this->packagingRepository->find($binData['id']);
-            if ($packingFromDb === null) { // Packing no longer supported
-                if ($cached !== null) {
+            if ($packingFromDb === null) { // packaging no longer supported
+                if ($cached !== null) { // clear cache
                     $this->entityManager->remove($cached);
                     $this->entityManager->flush();
                 }
-                $binData = $this->getFromApiAndCacheResponse($items, $requestHash);
-            }
 
-            if (empty($binData)) {
-                $binData = $this->localPackagingCalculator->calculateOptimalBin(
-                    $this->getAvailablePackings(),
-                    $items
-                );
-            }
+                $binData = $this->getFromApiAndCacheResponse($items, $requestHash); // load new packaging
 
-            if (!empty($binData)) {
-                $packingFromDb = $this->packagingRepository->find($binData['id']);
-                if ($packingFromDb !== null) {
-                    return $packingFromDb;
+                if (!empty($binData)) {
+                    $packingFromDb = $this->packagingRepository->find($binData['id']);
                 }
             }
-
-            throw new \Exception('Packing not found in database');
         }
 
-        $binData = $this->localPackagingCalculator->calculateOptimalBin(
-            $this->getAvailablePackings(),
-            $items
-        );
-        if (!empty($binData)) {
-            $packingFromDb = $this->packagingRepository->find($binData['id']);
-            if ($packingFromDb !== null) {
-                return $packingFromDb;
-            }
+        $packingFromDb = $packingFromDb ?? $this->determineOptimalPackagingLocally($this->getAvailablePackaging(), $items);
+
+        if ($packingFromDb !== null) {
+            return $packingFromDb;
         }
 
-        throw new \Exception('Packing not found in database');
+        throw new NoAppropriatePackagingFoundException();
     }
 
+    /**
+     * @throws TotalItemsDimensionsException
+     * @throws CannotFitInOneBinException
+     * @throws NonPositiveItemWeightException
+     * @throws NonPositiveItemVolumeException
+     */
+    private function determineOptimalPackagingLocally(array $availablePackaging, array $items): ?Packaging
+    {
+        $binData = $this->localPackagingCalculator->calculateOptimalBin(
+            $availablePackaging,
+            $items
+        );
+
+        if (empty($binData)) {
+            return null;
+        }
+
+        /** @var Packaging $packingFromDb */
+        $packingFromDb = $this->packagingRepository->find($binData['id']);
+
+        return $packingFromDb;
+    }
+
+    /**
+     * @throws NoPackagingInDatabaseException
+     * @throws CannotFitInOneBinException
+     */
     private function getFromApiAndCacheResponse($items, $requestHash): array
     {
         try {
             $response = $this->client->post("$this->apiUrl/packer/pack", [
                 'json' => [
-                    'bins' => $this->getAvailablePackings(),
+                    'bins' => $this->getAvailablePackaging(),
                     'items' => $items,
                     'username' => $this->username,
                     'api_key' => $this->apiKey,
@@ -103,6 +126,10 @@ class PackingService
                 $response = $body['response'];
                 $binsPacked = $response['bins_packed'];
                 $binData = $binsPacked[0]['bin_data'];
+
+                if (count($binData) > 1) {
+                    throw new CannotFitInOneBinException();
+                }
 
                 $this->entityManager->persist(new PackerResponseCache($requestHash, json_encode($binData)));
                 $this->entityManager->flush();
@@ -120,10 +147,14 @@ class PackingService
 
     /**
      * @return array<int, array{id: string, h: float, w: float, d: float, wg: string, max_wg: float, q: null, cost: int, type: string}>
+     * @throws NoPackagingInDatabaseException
      */
-    private function getAvailablePackings(): array
+    private function getAvailablePackaging(): array
     {
         $packings = $this->packagingRepository->findAll();
+        if (empty($packings)) {
+            throw new NoPackagingInDatabaseException();
+        }
 
         return array_map(
             fn(Packaging $packaging) => $this->packagingToBin($packaging),

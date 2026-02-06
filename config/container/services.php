@@ -4,6 +4,7 @@ use App\Entity\Packaging;
 use App\Repository\PackerResponseCacheRepository;
 use App\Services\InputValidator;
 use App\Services\LocalPackagingCalculator;
+use App\Services\OutputFormatter;
 use App\Services\PackingService;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -17,6 +18,9 @@ return [
     },
     LocalPackagingCalculator::class => function () {
         return new LocalPackagingCalculator();
+    },
+    OutputFormatter::class => function () {
+        return new OutputFormatter();
     },
     PackingService::class => function (ContainerInterface $container) {
         return new PackingService(
