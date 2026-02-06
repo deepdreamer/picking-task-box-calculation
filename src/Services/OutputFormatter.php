@@ -39,9 +39,8 @@ class OutputFormatter
      */
     public function toJson(Packaging $packaging, int $options = 0): string
     {
-        $options |= JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT;
+        $json = json_encode($this->format($packaging), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-        $json = json_encode($this->format($packaging), $options);
         return $json !== false ? $json : '{}';
     }
 }

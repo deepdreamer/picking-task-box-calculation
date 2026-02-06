@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Exception;
 
-class NoAppropriatePackagingFoundException extends \Exception
+class InputValidationException extends \Exception
 {
     public function __construct(
-        string $message = 'No appropriate packaging found',
+        string $message,
         int $code = 0,
         ?\Throwable $previous = null
     ) {

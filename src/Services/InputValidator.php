@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Services\Exception\InputValidationException;
 use Psr\Http\Message\ServerRequestInterface;
 
 class InputValidator
 {
-    private const REQUIRED_KEYS = ['width', 'height', 'length', 'weight'];
+    private const array REQUIRED_KEYS = ['width', 'height', 'length', 'weight'];
 
-    /** @var list<array{width: int, height: int, length: int, weight: int}> */
+    /** @var list<array{width: float, height: float, length: float, weight: float}> */
     private array $products = [];
 
     /**
-     * @throws \InvalidArgumentException
+     * @throws InputValidationException
      */
     public function validateProducts(ServerRequestInterface $request): bool
     {
@@ -22,39 +23,50 @@ class InputValidator
         $decoded = json_decode($content, true);
 
         if (!is_array($decoded)) {
-            throw new \InvalidArgumentException('Products must be a JSON array.');
+            throw new InputValidationException('Products must be a JSON array.');
+        }
+
+        if ($decoded === []) {
+            throw new InputValidationException('Product list must not be empty.');
         }
 
         $products = [];
         foreach ($decoded as $index => $item) {
             if (!is_array($item)) {
-                throw new \InvalidArgumentException("Product at index {$index} must be an array.");
+                throw new InputValidationException("Product at index {$index} must be an array.");
             }
 
             foreach (self::REQUIRED_KEYS as $key) {
                 if (!array_key_exists($key, $item)) {
-                    throw new \InvalidArgumentException("Product at index {$index} is missing key '{$key}'.");
+                    throw new InputValidationException("Product at index {$index} is missing key '{$key}'.");
                 }
-                if (!is_int($item[$key])) {
-                    throw new \InvalidArgumentException("Product at index {$index}, key '{$key}' must be an integer.");
+                if (!is_numeric($item[$key])) {
+                    throw new InputValidationException("Product at index {$index}, key '{$key}' must be an number.");
                 }
             }
 
             $extra = array_diff_key($item, array_flip(self::REQUIRED_KEYS));
             if ($extra !== []) {
-                throw new \InvalidArgumentException(
+                throw new InputValidationException(
                     "Product at index {$index} has unexpected keys: " . implode(', ', array_keys($extra))
                 );
             }
 
-            /** @var int $width */
-            $width = $item['width'];
-            /** @var int $height */
-            $height = $item['height'];
-            /** @var int $length */
-            $length = $item['length'];
-            /** @var int $weight */
-            $weight = $item['weight'];
+            $width = (float) $item['width'];
+            $height = (float) $item['height'];
+            $length = (float) $item['length'];
+            $weight = (float) $item['weight'];
+
+            if ($width <= 0 || $height <= 0 || $length <= 0) {
+                throw new InputValidationException(
+                    "Product at index {$index}: width, height, and length must be positive."
+                );
+            }
+            if ($weight <= 0) {
+                throw new InputValidationException(
+                    "Product at index {$index}: weight must be positive."
+                );
+            }
             $products[] = [
                 'width' => $width,
                 'height' => $height,
@@ -69,7 +81,8 @@ class InputValidator
 
 
     /**
-     * @return list<array{width: int, height: int, length: int, weight: int}>
+     * @return list<array{width: float, height: float, length: float, weight: float}>
+     * @throws InputValidationException
      */
     public function getProducts(ServerRequestInterface $request): array
     {

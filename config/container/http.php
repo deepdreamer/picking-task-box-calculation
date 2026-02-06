@@ -6,6 +6,9 @@ use GuzzleHttp\Client;
 
 return [
     Client::class => function () {
-        return new Client();
+        return new Client([
+            'connect_timeout' => 5,
+            'timeout' => 15,
+        ]);
     },
 ];

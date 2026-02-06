@@ -1,14 +1,20 @@
-.PHONY: phpstan phpcs phpcbf phpcbf-all help
+.PHONY: phpunit phpstan phpcs phpcbf phpcbf-all help
 
 # Default target
 help:
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
+	@echo "  phpunit     Run PHPUnit tests inside the app container"
 	@echo "  phpstan     Run PHPStan (composer phpstan) inside the app container"
 	@echo "  phpcs       Run PHP CodeSniffer (composer phpcs) inside the app container"
 	@echo "  phpcbf      Run PHP CodeSniffer fixer once (composer phpcbf)"
+	@echo "  phpcbf-all  Run PHP CodeSniffer fixer repeatedly until no more fixes (max 10 passes)"
 	@echo "  help        Show this help"
+
+# Run PHPUnit in the app container
+phpunit:
+	docker compose run --rm shipmonk-packing-app ./vendor/bin/phpunit
 
 # Run PHPStan in the app container
 phpstan:
