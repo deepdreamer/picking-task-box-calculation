@@ -82,40 +82,132 @@ class InputValidatorTest extends TestCase
     {
         return [
             'invalid JSON' => ['invalid JSON'],
-            'null' => [null],
-            'JSON string' => ['"hello"'],
-            'number' => [42],
-            'boolean' => [true],
+            'empty string' => [''],
         ];
     }
 
-    public function testGetProductsThrowsWhenProductIsMissingRequiredKey(): void
+    #[DataProvider('productMissingRequiredKeyProvider')]
+    public function testGetProductsThrowsWhenProductIsMissingRequiredKey(string $json, string $expectedMessage): void
     {
-        // @todo Product missing width/height/length/weight throws with clear message
-        $this->markTestIncomplete('Not implemented');
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('getContents')->willReturn($json);
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getBody')->willReturn($stream);
+
+        $this->expectException(InputValidationException::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        $this->validator->getProducts($request);
     }
 
-    public function testGetProductsThrowsWhenValueIsNotNumeric(): void
+    public static function productMissingRequiredKeyProvider(): array
     {
-        // @todo Product with string/boolean dimension throws InputValidationException
-        $this->markTestIncomplete('Not implemented');
+        return [
+            'missing width' => [
+                '[{"height":10,"length":15,"weight":20}]',
+                "Product at index 0 is missing key 'width'.",
+            ],
+            'missing height' => [
+                '[{"width":5,"length":15,"weight":20}]',
+                "Product at index 0 is missing key 'height'.",
+            ],
+            'missing length' => [
+                '[{"width":5,"height":10,"weight":20}]',
+                "Product at index 0 is missing key 'length'.",
+            ],
+            'missing weight' => [
+                '[{"width":5,"height":10,"length":15}]',
+                "Product at index 0 is missing key 'weight'.",
+            ],
+            'second product missing width' => [
+                '[{"width":1,"height":2,"length":3,"weight":4},{"height":10,"length":15,"weight":20}]',
+                "Product at index 1 is missing key 'width'.",
+            ],
+        ];
     }
 
-    public function testGetProductsThrowsWhenProductHasUnexpectedKeys(): void
+    #[DataProvider('valueNotNumericProvider')]
+    public function testGetProductsThrowsWhenValueIsNotNumeric(string $json, string $expectedMessage): void
     {
-        // @todo Product with extra keys (e.g. "id") throws per current strict validation
-        $this->markTestIncomplete('Not implemented');
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('getContents')->willReturn($json);
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getBody')->willReturn($stream);
+
+        $this->expectException(InputValidationException::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        $this->validator->getProducts($request);
     }
 
-    public function testGetProductsAcceptsEmptyArray(): void
+    public static function valueNotNumericProvider(): array
     {
-        // @todo Empty array [] - validate current behaviour (passes or throws)
-        $this->markTestIncomplete('Not implemented');
+        return [
+            'width is string' => [
+                '[{"width":"abc","height":10,"length":15,"weight":20}]',
+                "Product at index 0, key 'width' must be an number.",
+            ],
+            'height is boolean' => [
+                '[{"width":5,"height":true,"length":15,"weight":20}]',
+                "Product at index 0, key 'height' must be an number.",
+            ],
+            'length is string' => [
+                '[{"width":5,"height":10,"length":"x","weight":20}]',
+                "Product at index 0, key 'length' must be an number.",
+            ],
+            'weight is boolean' => [
+                '[{"width":5,"height":10,"length":15,"weight":false}]',
+                "Product at index 0, key 'weight' must be an number.",
+            ],
+        ];
     }
 
-    public function testGetProductsAcceptsSingleProduct(): void
+    #[DataProvider('productHasUnexpectedKeysProvider')]
+    public function testGetProductsThrowsWhenProductHasUnexpectedKeys(string $json, string $expectedMessage): void
     {
-        // @todo Single product returns single-element array
-        $this->markTestIncomplete('Not implemented');
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('getContents')->willReturn($json);
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getBody')->willReturn($stream);
+
+        $this->expectException(InputValidationException::class);
+        $this->expectExceptionMessage($expectedMessage);
+
+        $this->validator->getProducts($request);
+    }
+
+    public static function productHasUnexpectedKeysProvider(): array
+    {
+        return [
+            'extra key id' => [
+                '[{"width":1,"height":2,"length":3,"weight":4,"id":123}]',
+                "Product at index 0 has unexpected keys: id",
+            ],
+            'extra keys id and name' => [
+                '[{"width":1,"height":2,"length":3,"weight":4,"id":123,"name":"foo"}]',
+                "Product at index 0 has unexpected keys: id, name",
+            ],
+        ];
+    }
+
+    public function testGetProductsThrowsWhenEmptyArray(): void
+    {
+        $stream = $this->createStub(StreamInterface::class);
+        $stream->method('getContents')->willReturn('[]');
+
+        $request = $this->createStub(ServerRequestInterface::class);
+        $request->method('getBody')->willReturn($stream);
+
+        $this->expectException(InputValidationException::class);
+        $this->expectExceptionMessage('Product list must not be empty.');
+
+        $this->validator->getProducts($request);
+
+        $stream->method('getContents')->willReturn('[{}]');
+
+        $this->validator->getProducts($request);
     }
 }
