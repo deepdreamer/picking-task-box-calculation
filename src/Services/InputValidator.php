@@ -52,10 +52,11 @@ class InputValidator
                 );
             }
 
-            $width = (float) $item['width'];
-            $height = (float) $item['height'];
-            $length = (float) $item['length'];
-            $weight = (float) $item['weight'];
+            $width = $this->enforceNumericValueConvertToFloat($item['width']);
+            $height = $this->enforceNumericValueConvertToFloat($item['height']);
+            $length = $this->enforceNumericValueConvertToFloat($item['length']);
+            $weight = $this->enforceNumericValueConvertToFloat($item['weight']);
+
 
             if ($width <= 0 || $height <= 0 || $length <= 0) {
                 throw new InputValidationException(
@@ -89,5 +90,19 @@ class InputValidator
         $this->validateProducts($request);
 
         return $this->products;
+    }
+
+    /**
+     * @throws InputValidationException
+     */
+    private function enforceNumericValueConvertToFloat(mixed $value): float
+    {
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (float) $value;
+        }
+        throw new InputValidationException('Expected numeric value');
     }
 }

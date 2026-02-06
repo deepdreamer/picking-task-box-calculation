@@ -14,6 +14,7 @@ use App\Services\Exception\NoPackagingInDatabaseException;
 use App\Repository\PackagingRepository;
 use App\Repository\PackerResponseCacheRepository;
 use App\Services\Exception\TotalItemsDimensionsException;
+use App\Services\Exception\UnexpectedApiResponseFormatException;
 use Doctrine\ORM\EntityManagerInterface;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -35,7 +36,7 @@ class PackingService
     }
 
     /**
-     * @param list<array{width: int, height: int, length: int, weight: int}> $products
+     * @param list<array{width: int|float, height: int|float, length: int|float, weight: int|float}> $products
      * @throws CannotFitInOneBinException
      * @throws NoAppropriatePackagingFoundException
      * @throws NoPackagingInDatabaseException
@@ -53,7 +54,7 @@ class PackingService
             $binData = json_decode($cached->responseBody, true);
             $binData = is_array($binData) ? $binData : [];
         } else {
-            $binData = $this->getFromApiAndCacheResponse($items, $requestHash);
+            $binData = $this->getFromApiWithFallback($items, $requestHash);
         }
 
         $packingFromDb = null;
@@ -66,7 +67,7 @@ class PackingService
                     $this->entityManager->flush();
                 }
 
-                $binData = $this->getFromApiAndCacheResponse($items, $requestHash); // load new packaging
+                $binData = $this->getFromApiWithFallback($items, $requestHash); // load new packaging
 
                 if ($binData !== []) {
                     /** @var array{id: int|string} $binData */
@@ -119,6 +120,22 @@ class PackingService
      * @throws NoPackagingInDatabaseException
      * @throws CannotFitInOneBinException
      */
+    private function getFromApiWithFallback(array $items, string $requestHash): array
+    {
+        try {
+            return $this->getFromApiAndCacheResponse($items, $requestHash);
+        } catch (UnexpectedApiResponseFormatException $e) {
+            $this->logger->warning('API response format unexpected, using local fallback', ['exception' => $e]);
+            return [];
+        }
+    }
+
+    /**
+     * @param array<int, array{id: string, w: int, h: int, d: int, q: int, wg: int, vr: int}> $items
+     * @return array<string, mixed>
+     * @throws NoPackagingInDatabaseException
+     * @throws UnexpectedApiResponseFormatException
+     */
     private function getFromApiAndCacheResponse(array $items, string $requestHash): array
     {
         try {
@@ -134,7 +151,7 @@ class PackingService
             if ($response->getStatusCode() === 200) {
                 $body = json_decode($response->getBody()->getContents(), true);
                 if (!is_array($body)) {
-                    return [];
+                    throw new UnexpectedApiResponseFormatException('Response body is not a valid JSON object');
                 }
                 $responseData = $body['response'] ?? [];
                 if (
@@ -142,7 +159,7 @@ class PackingService
                     || !isset($responseData['bins_packed'])
                     || !is_array($responseData['bins_packed'])
                 ) {
-                    return [];
+                    throw new UnexpectedApiResponseFormatException('Missing or invalid response.bins_packed');
                 }
                 $binsPacked = $responseData['bins_packed'];
                 if (
@@ -150,11 +167,11 @@ class PackingService
                     || !is_array($binsPacked[0])
                     || !isset($binsPacked[0]['bin_data'])
                 ) {
-                    return [];
+                    throw new UnexpectedApiResponseFormatException('Missing or invalid first bin_data in bins_packed');
                 }
                 $binData = $binsPacked[0]['bin_data'];
                 if (!is_array($binData)) {
-                    return [];
+                    throw new UnexpectedApiResponseFormatException('bin_data is not an array');
                 }
                 /** @var array<string, mixed> $binData */
                 $encoded = json_encode($binData);
@@ -212,7 +229,7 @@ class PackingService
     }
 
     /**
-     * @param list<array{width: int, height: int, length: int, weight: int}> $products
+     * @param list<array{width: int|float, height: int|float, length: int|float, weight: int|float}> $products
      * @return list<array{id: string, w: int, h: int, d: int, q: int, wg: int, vr: int}>
      */
     private function prepareProducts(array $products): array
@@ -220,11 +237,11 @@ class PackingService
         return array_map(
             fn(array $product, int $index) => [
                 'id' => 'Item' . ($index + 1),
-                'w' => $product['width'],
-                'h' => $product['height'],
-                'd' => $product['length'],
+                'w' => (int) $product['width'],
+                'h' => (int) $product['height'],
+                'd' => (int) $product['length'],
                 'q' => 1,
-                'wg' => $product['weight'],
+                'wg' => (int) $product['weight'],
                 'vr' => 1,
             ],
             $products,
