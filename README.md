@@ -11,3 +11,7 @@
 ### adminer
 - Open `http://localhost:8080/?server=mysql&username=root&db=packing`
 - Password: secret
+
+### example how to run test
+#### specific method
+- `docker compose run --rm shipmonk-packing-app ./vendor/bin/phpunit tests/Unit/Services/InputValidatorTest.php --filter testGetProductsThrowsWhenInputIsNotJsonArray`
