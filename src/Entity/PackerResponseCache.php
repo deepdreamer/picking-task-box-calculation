@@ -19,7 +19,7 @@ class PackerResponseCache
     }
 
     #[ORM\Column(type: Types::TEXT)]
-    private string $responseBody {
+    public string $responseBody {
         get {
             return $this->responseBody;
         }

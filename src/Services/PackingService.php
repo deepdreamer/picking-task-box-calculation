@@ -3,8 +3,11 @@
 namespace App\Services;
 
 use App\Entity\Packaging;
+use App\Entity\PackerResponseCache;
 use App\Repository\PackagingRepository;
+use App\Services\LocalPackagingCalculator;
 use App\Repository\PackerResponseCacheRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\Log\LoggerInterface;
@@ -18,25 +21,72 @@ class PackingService
         private Client $client,
         private PackagingRepository $packagingRepository,
         private LoggerInterface $logger,
-        private PackerResponseCacheRepository $packerResponseCacheRepository
+        private PackerResponseCacheRepository $packerResponseCacheRepository,
+        private EntityManagerInterface $entityManager,
+        private LocalPackagingCalculator $localPackagingCalculator
     )
     {
 
     }
 
-    public function getOptimalBox(array $products): void
+    /**
+     * @throws \Exception
+     */
+    public function getOptimalBox(array $products): Packaging
     {
         $items = $this->canonicalizeItems($this->prepareProducts($products));
         $canonizedItemsString = json_encode($items, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $requestHash = hash('sha256', $canonizedItemsString);
         $cached = $this->packerResponseCacheRepository->findByRequestHash($requestHash);
         if ($cached !== null) {
-            $body = json_decode($cached->getResponseBody(), true);
-            var_dump($body);
-            // use $body['response'] same as when you get it from the API
-            // ...
-            return;
+            $binData = json_decode($cached->responseBody, true);
+        } else {
+            $binData = $this->getFromApiAndCacheResponse($items, $requestHash);
         }
+
+        if (!empty($binData)) {
+            $packingFromDb = $this->packagingRepository->find($binData['id']);
+            if ($packingFromDb === null) { // Packing no longer supported
+                if ($cached !== null) {
+                    $this->entityManager->remove($cached);
+                    $this->entityManager->flush();
+                }
+                $binData = $this->getFromApiAndCacheResponse($items, $requestHash);
+            }
+
+            if (empty($binData)) {
+                $binData = $this->localPackagingCalculator->calculateOptimalBin(
+                    $this->getAvailablePackings(),
+                    $items
+                );
+            }
+
+            if (!empty($binData)) {
+                $packingFromDb = $this->packagingRepository->find($binData['id']);
+                if ($packingFromDb !== null) {
+                    return $packingFromDb;
+                }
+            }
+
+            throw new \Exception('Packing not found in database');
+        }
+
+        $binData = $this->localPackagingCalculator->calculateOptimalBin(
+            $this->getAvailablePackings(),
+            $items
+        );
+        if (!empty($binData)) {
+            $packingFromDb = $this->packagingRepository->find($binData['id']);
+            if ($packingFromDb !== null) {
+                return $packingFromDb;
+            }
+        }
+
+        throw new \Exception('Packing not found in database');
+    }
+
+    private function getFromApiAndCacheResponse($items, $requestHash): array
+    {
         try {
             $response = $this->client->post("$this->apiUrl/packer/pack", [
                 'json' => [
@@ -53,25 +103,19 @@ class PackingService
                 $response = $body['response'];
                 $binsPacked = $response['bins_packed'];
                 $binData = $binsPacked[0]['bin_data'];
-                var_dump($binData);
+
+                $this->entityManager->persist(new PackerResponseCache($requestHash, json_encode($binData)));
+                $this->entityManager->flush();
+
+                return $binData;
             } else {
                 $this->logger->error('Third party api error', ['exception' => $response]);
             }
-
         } catch (GuzzleException $e) {
             $this->logger->error('Packing service error', ['exception' => $e]);
         }
 
-
-
-
-//        var_dump($response->getStatusCode());
-//        $response = json_decode($response->getBody()->getContents(), true);
-//        var_dump($response);
-//        $binsPacked = $response['response'];
-//        $binsPacked = $response['response']['bins_packed'];
-
-//        var_dump($binsPacked);
+        return [];
     }
 
     /**
@@ -93,7 +137,7 @@ class PackingService
     private function packagingToBin(Packaging $packaging): array
     {
         return [
-            'id' => 'Pack ' . $packaging->id,
+            'id' => $packaging->id,
             'h' => $packaging->height,
             'w' => $packaging->width,
             'd' => $packaging->length,
