@@ -18,19 +18,39 @@ class Packaging
     #[ORM\Id]
     #[ORM\Column(type: Types::INTEGER)]
     #[ORM\GeneratedValue]
-    private ?int $id = null;
+    public ?int $id = null {
+        get {
+            return $this->id;
+        }
+    }
 
     #[ORM\Column(type: Types::FLOAT)]
-    private float $width;
+    public float $width {
+        get {
+            return $this->width;
+        }
+    }
 
     #[ORM\Column(type: Types::FLOAT)]
-    private float $height;
+    public float $height {
+        get {
+            return $this->height;
+        }
+    }
 
     #[ORM\Column(type: Types::FLOAT)]
-    private float $length;
+    public float $length {
+        get {
+            return $this->length;
+        }
+    }
 
     #[ORM\Column(type: Types::FLOAT)]
-    private float $maxWeight;
+    public float $maxWeight {
+        get {
+            return $this->maxWeight;
+        }
+    }
 
     public function __construct(float $width, float $height, float $length, float $maxWeight)
     {
@@ -40,28 +60,4 @@ class Packaging
         $this->maxWeight = $maxWeight;
     }
 
-    public function getId(): ?int
-    {
-        return $this->id;
-    }
-
-    public function getWidth(): float
-    {
-        return $this->width;
-    }
-
-    public function getHeight(): float
-    {
-        return $this->height;
-    }
-
-    public function getLength(): float
-    {
-        return $this->length;
-    }
-
-    public function getMaxWeight(): float
-    {
-        return $this->maxWeight;
-    }
 }

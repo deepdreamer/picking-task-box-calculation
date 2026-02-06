@@ -22,7 +22,8 @@ $bootstrapParams = $params;
 $bootstrapParams['dbname'] = 'mysql'; // need existing database
 
 $bootstrapConn = DriverManager::getConnection($bootstrapParams);
-$bootstrapConn->executeStatement("CREATE DATABASE IF NOT EXISTS `{$testDbName}`");
+$bootstrapConn->executeStatement("DROP DATABASE IF EXISTS `{$testDbName}`");
+$bootstrapConn->executeStatement("CREATE DATABASE `{$testDbName}`");
 
 // Step 2: Create schema and seed data
 $projectRoot = __DIR__ . '/..';

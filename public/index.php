@@ -2,6 +2,7 @@
 
 use App\Bootstrap\RouteLoader;
 use DI\ContainerBuilder;
+use Psr\Log\LoggerInterface;
 use Slim\Factory\AppFactory;
 
 require __DIR__ . '/../bootstrap.php';
@@ -17,8 +18,16 @@ $app = AppFactory::create();
 
 RouteLoader::load($app);
 
-// Add error middleware (for development - shows errors)
-$app->addErrorMiddleware(true, true, true);
+$env = $_ENV['APP_ENV'] ?? 'dev';
+$isProd = $env === 'prod';
+
+$errorMiddleware = $app->addErrorMiddleware(
+    !$isProd,  // displayErrorDetails: true in dev, false in prod
+    true,      // logErrors
+    true,      // logErrorDetails
+    $container->get(LoggerInterface::class)
+);
+
 
 // Run the app
 $app->run();
