@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Services\Exception\CannotFitInOneBinException;
+use App\Services\Exception\NoAppropriatePackagingFoundException;
 use App\Services\Exception\NonPositiveItemVolumeException;
 use App\Services\Exception\NonPositiveItemWeightException;
 use App\Services\Exception\TotalItemsDimensionsException;
+use Symfony\Component\Routing\Exception\InvalidParameterException;
 
 /**
  * Calculates the optimal (smallest) packaging locally by volume and weight,
@@ -25,9 +27,14 @@ class LocalPackagingCalculator
      * @throws NonPositiveItemVolumeException
      * @throws NonPositiveItemWeightException
      * @throws TotalItemsDimensionsException
+     * @throws NoAppropriatePackagingFoundException
      */
     public function calculateOptimalBin(array $bins, array $items): array
     {
+        if ($bins === [] || $items === []) {
+            throw new InvalidParameterException('bins and items cannot be empty');
+        }
+
         $totalVolume = $this->totalItemsVolume($items);
         $totalWeight = $this->totalItemsWeight($items);
 
@@ -47,7 +54,12 @@ class LocalPackagingCalculator
             }
         }
 
-        throw new CannotFitInOneBinException();
+        if (count($items) > 1) {
+            throw new CannotFitInOneBinException();
+        }
+
+        throw new NoAppropriatePackagingFoundException();
+
     }
 
     /**

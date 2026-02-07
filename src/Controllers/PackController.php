@@ -39,9 +39,9 @@ class PackController
             $response->getBody()->write($body !== false ? $body : '{}');
             return $response->withStatus(400)->withHeader('Content-Type', 'application/json');
         } catch (
-            TotalItemsDimensionsException
-            | NonPositiveItemVolumeException
-            | NonPositiveItemWeightException
+            TotalItemsDimensionsException // @todo: this can be removed, if we enforce positive numeric values, over engineering
+            | NonPositiveItemVolumeException // @todo: this should be taken care of by input validator
+            | NonPositiveItemWeightException // @todo: this should be taken care of by input validator
             | NoPackagingInDatabaseException $e
         ) {
             $this->logger->error('Domain validation or packaging error', ['exception' => $e]);
