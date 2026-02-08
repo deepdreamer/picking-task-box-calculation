@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use Doctrine\DBAL\DriverManager;
-
 return [
     // Database connection parameters for Doctrine DBAL
     'connection_params' => [

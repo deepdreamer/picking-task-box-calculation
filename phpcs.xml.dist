@@ -10,6 +10,7 @@
     <arg name="warning-severity" value="1"/>
 
     <file>src</file>
+    <file>tests</file>
     <file>config</file>
     <file>bootstrap.php</file>
     <file>cli-config.php</file>
@@ -18,10 +19,19 @@
     <file>public/index.php</file>
 
     <exclude-pattern>*/vendor/*</exclude-pattern>
-    <exclude-pattern>*/tests/*</exclude-pattern>
     <exclude-pattern>*/Entity/*</exclude-pattern>
+
+    <!-- Slevomat standard (for UnusedUses); path may already be set by dealerdirect/phpcodesniffer-composer-installer -->
+    <config name="installed_paths" value="vendor/slevomat/coding-standard"/>
 
     <rule ref="PSR12">
         <exclude name="Generic.Files.LineLength"/>
+    </rule>
+
+    <!-- Unused use statements: phpcs reports them, phpcbf removes them -->
+    <rule ref="SlevomatCodingStandard.Namespaces.UnusedUses">
+        <properties>
+            <property name="searchAnnotations" value="true"/>
+        </properties>
     </rule>
 </ruleset>

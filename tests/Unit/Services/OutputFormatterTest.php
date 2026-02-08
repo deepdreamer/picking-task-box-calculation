@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Services;
 
-use App\Entity\Packaging;
 use App\Services\OutputFormatter;
 use PHPUnit\Framework\TestCase;
 

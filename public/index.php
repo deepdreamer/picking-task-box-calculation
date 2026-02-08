@@ -16,6 +16,7 @@ $container = $containerBuilder->build();
 
 // Set container for Slim
 AppFactory::setContainer($container);
+
 $app = AppFactory::create();
 
 RouteLoader::load($app);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Entity\Packaging;
 use App\Repository\PackagingRepository;
-use App\Repository\PackerResponseCacheRepository;
+use App\Repository\CachedPackagingRepository;
 use App\Services\InputValidator;
 use App\Services\LocalPackagingCalculator;
 use App\Services\OutputFormatter;
@@ -34,8 +34,8 @@ return [
         $client = $container->get(Client::class);
         /** @var LoggerInterface $logger */
         $logger = $container->get(LoggerInterface::class);
-        /** @var PackerResponseCacheRepository $cacheRepo */
-        $cacheRepo = $container->get(PackerResponseCacheRepository::class);
+        /** @var CachedPackagingRepository $cacheRepo */
+        $cacheRepo = $container->get(CachedPackagingRepository::class);
         /** @var EntityManagerInterface $entityManager */
         $entityManager = $container->get(EntityManagerInterface::class);
         /** @var LocalPackagingCalculator $localCalc */

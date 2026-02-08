@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
-use App\Repository\PackerResponseCacheRepository;
+use App\Repository\CachedPackagingRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: PackerResponseCacheRepository::class)]
-#[ORM\Table(name: 'packer_response_cache')]
-class PackerResponseCache
+#[ORM\Entity(repositoryClass: CachedPackagingRepository::class)]
+class CachedPackaging
 {
     #[ORM\Id]
     #[ORM\Column(type: Types::STRING, length: 64)]

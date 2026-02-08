@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Entity\Packaging;
-use App\Entity\PackerResponseCache;
+use App\Entity\CachedPackaging;
 use App\Repository\PackagingRepository;
-use App\Repository\PackerResponseCacheRepository;
+use App\Repository\CachedPackagingRepository;
 use Doctrine\ORM\EntityManager;
 use Psr\Container\ContainerInterface;
 
@@ -17,11 +17,11 @@ return [
         $repository = $em->getRepository(Packaging::class);
         return $repository;
     },
-    PackerResponseCacheRepository::class => function (ContainerInterface $container) {
+    CachedPackagingRepository::class => function (ContainerInterface $container) {
         /** @var EntityManager $em */
         $em = $container->get(EntityManager::class);
-        /** @var PackerResponseCacheRepository $repository */
-        $repository = $em->getRepository(PackerResponseCache::class);
+        /** @var CachedPackagingRepository $repository */
+        $repository = $em->getRepository(CachedPackaging::class);
         return $repository;
     },
 ];
