@@ -4,16 +4,23 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Entity\CachedPackaging;
+use App\Services\LocalPackagingCalculator;
+use App\Services\PackingService;
 use App\Tests\TestCase\IntegrationTestCase;
+use Doctrine\ORM\EntityManagerInterface;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\ServerRequest;
 use GuzzleHttp\Psr7\Uri;
+use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface;
+use Slim\App;
 
 class PackEndpointTest extends IntegrationTestCase
 {
@@ -104,7 +111,87 @@ class PackEndpointTest extends IntegrationTestCase
         $this->assertJsonStringEqualsJsonString((string) $firstResponse->getBody(), (string) $secondResponse->getBody());
     }
 
-    private function givenAppWithMockedApiResponse(): \Slim\App
+    public function testPackCacheMissCreatesCachedPackagingRecordInDatabase(): void
+    {
+        $requestPayload = self::UNCACHED_VALID_PRODUCTS;
+        $requestHash = $this->buildRequestHashFromRequestPayload($requestPayload);
+        $history = [];
+
+        $apiClient = $this->createApiClientWithHistory(
+            [
+                new Response(
+                    200,
+                    ['Content-Type' => 'application/json'],
+                    (string) json_encode([
+                    'response' => [
+                        'bins_packed' => [
+                            ['bin_data' => ['id' => '5']],
+                        ],
+                        'not_packed_items' => [],
+                    ],
+                    ])
+                ),
+            ],
+            $history
+        );
+
+        $app = $this->createApp([
+            Client::class => static fn () => $apiClient,
+        ]);
+
+        $response = $this->whenPackEndpointIsCalledWithProducts($app, $requestPayload);
+
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertCount(1, $history, 'Expected exactly one API request on cache miss.');
+        $this->thenCachedPackagingRowContainsBinId($app, $requestHash, '5');
+    }
+
+    public function testPackUsesCachedPackagingWithoutCallingApiOrLocalCalculator(): void
+    {
+        $requestPayload = self::VALID_PRODUCTS;
+        $requestHash = $this->buildRequestHashFromRequestPayload($requestPayload);
+        $this->givenCachedPackagingRowInDatabase($requestHash, '1');
+        $history = [];
+
+        $apiClient = $this->createApiClientWithHistory([
+            new Response(
+                200,
+                ['Content-Type' => 'application/json'],
+                (string) json_encode([
+                    'response' => [
+                        'bins_packed' => [
+                            ['bin_data' => ['id' => '5']],
+                        ],
+                        'not_packed_items' => [],
+                    ],
+                ])
+            ),
+        ], $history);
+
+        $localPackagingCalculator = new class () extends LocalPackagingCalculator {
+            public int $calculateOptimalBinCallCount = 0;
+
+            public function calculateOptimalBin(array $bins, array $items): array
+            {
+                $this->calculateOptimalBinCallCount++;
+
+                return parent::calculateOptimalBin($bins, $items);
+            }
+        };
+
+        $app = $this->createApp([
+            Client::class => static fn () => $apiClient,
+            LocalPackagingCalculator::class => static fn () => $localPackagingCalculator,
+        ]);
+
+        $response = $this->whenPackEndpointIsCalledWithProducts($app, $requestPayload);
+
+        $this->thenResponseContainsExpectedPackedBox($response);
+        $this->assertCount(0, $history, 'Did not expect API requests when cached_packaging has a matching row.');
+        $this->assertSame(0, $localPackagingCalculator->calculateOptimalBinCallCount);
+    }
+
+    private function givenAppWithMockedApiResponse(): App
     {
         $apiResponseFixture = file_get_contents(__DIR__ . '/../ApiResponseExamples/expected_api_response.json');
         $this->assertNotFalse($apiResponseFixture, 'Fixture tests/ApiResponseExamples/expected_api_response.json must be readable.');
@@ -112,7 +199,7 @@ class PackEndpointTest extends IntegrationTestCase
         return $this->givenResponseFromApi($apiResponseFixture);
     }
 
-    private function givenResponseFromApi(string $responseBody): \Slim\App
+    private function givenResponseFromApi(string $responseBody): App
     {
         return $this->createApp([
             Client::class => static fn (): Client => new Client([
@@ -123,12 +210,12 @@ class PackEndpointTest extends IntegrationTestCase
         ]);
     }
 
-    private function whenPackEndpointIsCalledWithValidProducts(\Slim\App $app): ResponseInterface
+    private function whenPackEndpointIsCalledWithValidProducts(App $app): ResponseInterface
     {
         return $this->whenPackEndpointIsCalledWithProducts($app, self::VALID_PRODUCTS);
     }
 
-    private function whenPackEndpointIsCalledWithProducts(\Slim\App $app, string $products): ResponseInterface
+    private function whenPackEndpointIsCalledWithProducts(App $app, string $products): ResponseInterface
     {
         $request = new ServerRequest(
             'POST',
@@ -216,5 +303,67 @@ class PackEndpointTest extends IntegrationTestCase
                 'dimensions' => '2.50 × 3.00 × 1.00 cm',
             ],
         ];
+    }
+
+    private function buildRequestHashFromRequestPayload(string $payload): string
+    {
+        /** @var array{products: list<array{width: int|float, height: int|float, length: int|float, weight: int|float}>} $decoded */
+        $decoded = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+
+        return PackingService::buildRequestHash($decoded['products']);
+    }
+
+    private function givenCachedPackagingRowInDatabase(string $requestHash, string $binId): void
+    {
+        $app = $this->createApp();
+        $container = $this->getContainerFromApp($app);
+        /** @var EntityManagerInterface $entityManager */
+        $entityManager = $container->get(EntityManagerInterface::class);
+
+        $entityManager->persist(new CachedPackaging($requestHash, (string) json_encode(['id' => $binId])));
+        $entityManager->flush();
+    }
+
+    private function thenCachedPackagingRowContainsBinId(App $app, string $requestHash, string $expectedBinId): void
+    {
+        $container = $this->getContainerFromApp($app);
+        /** @var EntityManagerInterface $entityManager */
+        $entityManager = $container->get(EntityManagerInterface::class);
+
+        /** @var CachedPackaging|null $cachedPackaging */
+        $cachedPackaging = $entityManager->find(CachedPackaging::class, $requestHash);
+        $this->assertInstanceOf(
+            CachedPackaging::class,
+            $cachedPackaging,
+            'Expected cached_packaging entity to exist for request hash.'
+        );
+        $this->assertSame($requestHash, $cachedPackaging->getRequestHash());
+
+        $decodedResponseBody = json_decode($cachedPackaging->responseBody, true);
+        $this->assertIsArray($decodedResponseBody);
+        $this->assertSame($expectedBinId, (string) ($decodedResponseBody['id'] ?? ''));
+    }
+
+    private function getContainerFromApp(App $app): ContainerInterface
+    {
+        $container = $app->getContainer();
+        $this->assertNotNull($container);
+
+        return $container;
+    }
+
+    /**
+     * @param list<Response|\Throwable> $queue
+     * @param array<int, mixed> $history
+     */
+    private function createApiClientWithHistory(array $queue, array &$history): Client
+    {
+        $mockHandler = new MockHandler($queue);
+        $stack = HandlerStack::create($mockHandler);
+        $stack->push(Middleware::history($history));
+
+        return new Client([
+            'handler' => $stack,
+        ]);
     }
 }

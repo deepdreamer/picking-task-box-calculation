@@ -27,7 +27,7 @@ class PackingServiceTest extends TestCase
     public function testGetOptimalBoxReturnsCachedResultWhenCacheHit(): void
     {
         // Given
-        $client = $this->createStub(Client::class);
+        $client = $this->createMock(Client::class);
         $packagingRepository = $this->createMock(PackagingRepository::class);
         $logger = $this->createStub(Logger::class);
         $cachedPackagingRepository = $this->createMock(CachedPackagingRepository::class);
@@ -44,6 +44,7 @@ class PackingServiceTest extends TestCase
 
         $this->whenPackagingIsCached($cachedPackagingRepository, $expectedRequestHash, $givenCachedBinId);
         $this->thenLocalCalculationWillNotBeUsed($localPackagingCalculator);
+        $this->thenRequestToApiWillNotBeMade($client);
         $this->thenPackagingWillBeLoadedFromDb($packagingRepository, $givenCachedBinId, $givenExpectedPackaging);
 
         $packingService = new PackingService(
@@ -194,7 +195,7 @@ class PackingServiceTest extends TestCase
         $expectedBins = $this->buildExpectedApiBinsPayload($availablePackaging);
 
         $this->whenPackagingIsNotCached($cachedPackagingRepository, $expectedRequestHash);
-        $this->thenAvailablePackagingWillBeLoadedTwiceForApiFallback($packagingRepository, $availablePackaging);
+        $this->thenAvailablePackagingWillBeLoadedFromDb($packagingRepository, $availablePackaging);
         $this->whenApiRequestFails($client);
         $this->thenLocalCalculationWillBeUsedAndReturnSelectedPackaging(
             $localPackagingCalculator,
@@ -291,7 +292,7 @@ class PackingServiceTest extends TestCase
         $this->whenPackagingIsNotCached($cachedPackagingRepository, $expectedRequestHash);
         $this->thenAvailablePackagingWillBeLoaded($packagingRepository, $availablePackaging);
         $this->thenNoWriteToDatabase($entityManager);
-        $this->thenApiWillBeCalledAndReturnMultiplePackedBins(
+        $this->thenApiWillBeCalledAndReturnsMultiplePackedBins(
             $client,
             $expectedBins,
             $expectedItems,
@@ -337,7 +338,7 @@ class PackingServiceTest extends TestCase
         $expectedBins = $this->buildExpectedApiBinsPayload($availablePackaging);
 
         $this->whenPackagingIsNotCached($cachedPackagingRepository, $expectedRequestHash);
-        $this->thenAvailablePackagingWillBeLoadedTwiceForApiFallback($packagingRepository, $availablePackaging);
+        $this->thenAvailablePackagingWillBeLoadedFromDb($packagingRepository, $availablePackaging);
         $this->whenApiRequestFails($client);
         $this->thenLocalCalculationWillBeUsedAndFail($localPackagingCalculator, $expectedBins, $expectedItems);
         $this->thenNoWriteToDatabase($entityManager);
@@ -539,6 +540,11 @@ class PackingServiceTest extends TestCase
         $localPackagingCalculator->expects($this->never())->method('calculateOptimalBin');
     }
 
+    private function thenRequestToApiWillNotBeMade(MockObject $client): void
+    {
+        $client->expects($this->never())->method('post');
+    }
+
     private function thenPackagingWillBeLoadedFromDb(
         MockObject $packagingRepository,
         string $binId,
@@ -595,7 +601,7 @@ class PackingServiceTest extends TestCase
             ->willReturn($this->mockApiResponse($returnedBinId));
     }
 
-    private function thenApiWillBeCalledAndReturnMultiplePackedBins(
+    private function thenApiWillBeCalledAndReturnsMultiplePackedBins(
         MockObject $client,
         array $expectedBins,
         array $expectedItems,
@@ -637,12 +643,12 @@ class PackingServiceTest extends TestCase
             ->willReturn([]);
     }
 
-    private function thenAvailablePackagingWillBeLoadedTwiceForApiFallback(
+    private function thenAvailablePackagingWillBeLoadedFromDb(
         MockObject $packagingRepository,
         array $availablePackagings
     ): void {
         $packagingRepository
-            ->expects($this->exactly(2))
+            ->expects($this->once())
             ->method('findAll')
             ->willReturn($availablePackagings);
     }
