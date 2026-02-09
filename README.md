@@ -22,7 +22,7 @@ Env loading follows a Symfony-like pattern:
   - `.env.example`, `.env.prod.example`, `.env.dev.example`, `.env.test.example`
 
 Application:
-- `APP_ENV` (default: `prod`)
+- `APP_ENV` (required)
   - Runtime environment selector used to load `.env.{APP_ENV}`.
   - In this project, supported files are `prod`, `dev`, and `test`.
 
