@@ -9,7 +9,7 @@ use Psr\Http\Message\ServerRequestInterface;
 
 class InputValidator
 {
-    private const array REQUIRED_KEYS = ['width', 'height', 'length', 'weight'];
+    private const array REQUIRED_KEYS = ['width', 'height', 'length', 'weight', 'id'];
 
     /** @var list<array{width: float, height: float, length: float, weight: float}> */
     private array $products = [];
@@ -31,7 +31,16 @@ class InputValidator
         }
 
         $products = [];
-        foreach ($decoded as $index => $item) {
+        if (!array_key_exists('products', $decoded) || !is_array($decoded['products'])) {
+            throw new InputValidationException('Products must be a JSON array.');
+        }
+        $productsInRequest = $decoded['products'];
+        if ($productsInRequest === []) {
+            throw new InputValidationException('Product list must not be empty.');
+        }
+
+
+        foreach ($productsInRequest as $index => $item) {
             if (!is_array($item)) {
                 throw new InputValidationException("Product at index {$index} must be an array.");
             }

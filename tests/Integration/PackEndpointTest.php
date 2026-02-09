@@ -15,8 +15,8 @@ use Psr\Http\Message\ResponseInterface;
 
 class PackEndpointTest extends IntegrationTestCase
 {
-    private const VALID_PRODUCTS = '[{"width": 1, "height": 1, "length": 1, "weight": 1}, {"width": 2, "height": 2, "length": 1, "weight": 2}, {"width": 1, "height": 1, "length": 1, "weight": 1}]';
-    private const UNCACHED_VALID_PRODUCTS = '[{"width": 9, "height": 9, "length": 9, "weight": 9}]';
+    private const VALID_PRODUCTS = '{"products":[{"id":1,"width":1,"height":1,"length":1,"weight":1},{"id":2,"width":2,"height":2,"length":1,"weight":2},{"id":3,"width":1,"height":1,"length":1,"weight":1}]}';
+    private const UNCACHED_VALID_PRODUCTS = '{"products":[{"id":999,"width":9,"height":9,"length":9,"weight":9}]}';
 
     public function testPackReturns200WithValidProducts(): void
     {
@@ -125,7 +125,7 @@ class PackEndpointTest extends IntegrationTestCase
             'POST',
             new Uri('http://localhost/pack'),
             ['Content-Type' => 'application/json'],
-            '[{"width": 1, "height": 1, "length": 1, "weight": 1}'
+            '{"products":[{"id":1,"width":1,"height":1,"length":1,"weight":1}]'
         );
     }
 
@@ -135,7 +135,7 @@ class PackEndpointTest extends IntegrationTestCase
             'POST',
             new Uri('http://localhost/pack'),
             ['Content-Type' => 'application/json'],
-            '[]'
+            '{"products":[]}'
         );
     }
 
@@ -145,7 +145,7 @@ class PackEndpointTest extends IntegrationTestCase
             'POST',
             new Uri('http://localhost/pack'),
             ['Content-Type' => 'application/json'],
-            '[{"width": 1, "height": 1, "length": 1}]'
+            '{"products":[{"id":1,"width":1,"height":1,"length":1}]}'
         );
     }
 

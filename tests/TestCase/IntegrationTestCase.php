@@ -74,6 +74,5 @@ abstract class IntegrationTestCase extends TestCase
             $entityManager->clear();
             $entityManager->getConnection()->close();
         }
-
     }
 }

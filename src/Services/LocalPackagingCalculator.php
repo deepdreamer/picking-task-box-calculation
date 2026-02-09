@@ -56,7 +56,7 @@ class LocalPackagingCalculator
     {
         $volume = 0.0;
         foreach ($items as $item) {
-            $quantity = (int) ($item['q'] ?? 1);
+            $quantity = $item['q'] ?? 1;
             $volume += (float) $item['w'] * (float) $item['h'] * (float) $item['d'] * $quantity;
         }
         return $volume;
@@ -69,7 +69,7 @@ class LocalPackagingCalculator
     {
         $weight = 0.0;
         foreach ($items as $item) {
-            $quantity = (int) ($item['q'] ?? 1);
+            $quantity = $item['q'] ?? 1;
             $weight += (float) $item['wg'] * $quantity;
         }
         return $weight;
@@ -116,12 +116,12 @@ class LocalPackagingCalculator
      */
     private function canSingleItemFitBin(array $item, array $bin): bool
     {
-        $itemW = (float) $item['w'];
-        $itemH = (float) $item['h'];
-        $itemD = (float) $item['d'];
-        $binW = (float) $bin['w'];
-        $binH = (float) $bin['h'];
-        $binD = (float) $bin['d'];
+        $itemW = (int) ceil($item['w']);
+        $itemH = (int) ceil($item['h']);
+        $itemD = (int) ceil($item['d']);
+        $binW = (int) ceil($bin['w']);
+        $binH = (int) ceil($bin['h']);
+        $binD = (int) ceil($bin['d']);
 
         $permutations = [
             [$itemW, $itemH, $itemD],
