@@ -6,8 +6,10 @@ namespace App\Tests\Integration;
 
 use App\Tests\TestCase\IntegrationTestCase;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Psr7\ServerRequest;
 use GuzzleHttp\Psr7\Uri;
@@ -17,6 +19,7 @@ class PackEndpointTest extends IntegrationTestCase
 {
     private const VALID_PRODUCTS = '{"products":[{"id":1,"width":1,"height":1,"length":1,"weight":1},{"id":2,"width":2,"height":2,"length":1,"weight":2},{"id":3,"width":1,"height":1,"length":1,"weight":1}]}';
     private const UNCACHED_VALID_PRODUCTS = '{"products":[{"id":999,"width":9,"height":9,"length":9,"weight":9}]}';
+    private const UNCACHED_OVERSIZED_PRODUCTS = '{"products":[{"id":1000,"width":10,"height":10,"length":10,"weight":10}]}';
 
     public function testPackReturns200WithValidProducts(): void
     {
@@ -60,6 +63,24 @@ class PackEndpointTest extends IntegrationTestCase
             ], JSON_THROW_ON_ERROR)
         );
         $response = $this->whenPackEndpointIsCalledWithProducts($app, self::UNCACHED_VALID_PRODUCTS);
+
+        $this->thenExpectException($response, 422, 'No appropriate packaging found');
+    }
+
+    public function testPackReturns422WhenApiClientThrowsExceptionAndLocalFallbackCannotFit(): void
+    {
+        $app = $this->createApp([
+            Client::class => static fn (): Client => new Client([
+                'handler' => HandlerStack::create(new MockHandler([
+                    new RequestException(
+                        'API request failed',
+                        new Request('POST', 'https://api.example.test/packer/packIntoMany')
+                    ),
+                ])),
+            ]),
+        ]);
+
+        $response = $this->whenPackEndpointIsCalledWithProducts($app, self::UNCACHED_OVERSIZED_PRODUCTS);
 
         $this->thenExpectException($response, 422, 'No appropriate packaging found');
     }

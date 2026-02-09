@@ -1,5 +1,8 @@
 ### init
 - `cp .env.example .env`
+- `cp .env.prod.example .env.prod`
+- `cp .env.dev.example .env.dev`
+- `cp .env.test.example .env.test`
 - `docker-compose up -d`
 - `docker-compose run shipmonk-packing-app bash`
 - `composer install && bin/doctrine orm:schema-tool:create && bin/doctrine dbal:run-sql "$(cat data/packaging-data.sql)"`
@@ -12,13 +15,11 @@
 Env loading follows a Symfony-like pattern:
 - `.env` contains shared/default values.
 - `bootstrap.php` loads `.env` first, then loads `.env.{APP_ENV}`.
-- Included environment files:
-  - `.env.prod`
-  - `.env.dev`
-  - `.env.test`
-- Use these examples:
-  - `.env.example` (shared/default values)
-  - `.env.prod.example` / `.env.dev.example` / `.env.test.example` (environment overrides)
+- `APP_ENV` is required and must be one of: `prod`, `dev`, `test`.
+- Environment files:
+  - `.env.prod`, `.env.dev`, `.env.test`
+- Example files:
+  - `.env.example`, `.env.prod.example`, `.env.dev.example`, `.env.test.example`
 
 Application:
 - `APP_ENV` (default: `prod`)
@@ -40,7 +41,7 @@ Database:
   - Database password.
 - `DB_CHARSET` (default: `utf8mb4`)
   - Database connection charset.
-- `DB_NAME` (overridden per environment)
+- `DB_NAME` (overridden by environment file)
   - `.env.prod`: `packing`
   - `.env.dev`: `packing`
   - `.env.test`: `packing_test`
@@ -67,14 +68,22 @@ Docker user mapping (docker-compose runtime):
   - Host user id used for container process user mapping.
 - `GID` (default in compose fallback: `1000`)
   - Host group id used for container process user mapping.
+  - Optional: export in shell before docker compose if needed:
+    - `export UID=$(id -u) GID=$(id -g)`
 
 ### adminer
 - Open `http://localhost:8080/?server=mysql&username=root&db=packing`
 - Password: secret
 
-### example how to run test
-#### all linters + full phpunit suite
+### tests and quality
+#### all linters + full PHPUnit suite
 - `make test`
 
-#### specific method
+#### single tools
+- `make phpunit`
+- `make phpstan`
+- `make phpcs`
+- `make phpcbf`
+
+#### specific PHPUnit method
 - `docker compose run --rm shipmonk-packing-app ./vendor/bin/phpunit tests/Unit/Services/InputValidatorTest.php --filter testGetProductsThrowsWhenInputIsNotJsonArray`

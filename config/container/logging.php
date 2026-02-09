@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Logging\GuzzleExceptionProcessor;
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
@@ -21,6 +22,7 @@ return [
 
         $minLevel = $env === 'prod' ? Level::Error : Level::Debug;
         $logger->pushHandler(new StreamHandler($logFile, $minLevel));
+        $logger->pushProcessor(new GuzzleExceptionProcessor());
 
         return $logger;
     },
