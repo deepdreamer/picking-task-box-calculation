@@ -10,12 +10,21 @@ use GuzzleHttp\Middleware;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
-const API_RETRY_MAX_ATTEMPTS = 3;
-const API_RETRY_BASE_DELAY_MS = 200;
-const API_RETRY_MAX_DELAY_MS = 2000;
-
 return [
     Client::class => function () {
+        $toPositiveInt = static function (mixed $value, int $default): int {
+            if (!is_numeric($value)) {
+                return $default;
+            }
+
+            $parsed = (int) $value;
+            return $parsed > 0 ? $parsed : $default;
+        };
+
+        $retryMaxAttempts = $toPositiveInt($_ENV['API_RETRY_MAX_ATTEMPTS'] ?? null, 3);
+        $retryBaseDelayMs = $toPositiveInt($_ENV['API_RETRY_BASE_DELAY_MS'] ?? null, 200);
+        $retryMaxDelayMs = $toPositiveInt($_ENV['API_RETRY_MAX_DELAY_MS'] ?? null, 2000);
+
         $handlerStack = HandlerStack::create();
         $handlerStack->push(Middleware::retry(
             /**
@@ -29,8 +38,8 @@ return [
                 RequestInterface $request,
                 ?ResponseInterface $response = null,
                 ?\Throwable $exception = null
-            ): bool {
-                if ($retries >= API_RETRY_MAX_ATTEMPTS) {
+            ) use ($retryMaxAttempts): bool {
+                if ($retries >= $retryMaxAttempts) {
                     return false;
                 }
 
@@ -56,9 +65,9 @@ return [
 
                 return false;
             },
-            static function (int $retries): int {
-                $exponentialDelay = API_RETRY_BASE_DELAY_MS * (2 ** max(0, $retries - 1));
-                $cappedDelay = min(API_RETRY_MAX_DELAY_MS, $exponentialDelay);
+            static function (int $retries) use ($retryBaseDelayMs, $retryMaxDelayMs): int {
+                $exponentialDelay = $retryBaseDelayMs * (2 ** max(0, $retries - 1));
+                $cappedDelay = min($retryMaxDelayMs, $exponentialDelay);
                 $jitterMs = random_int(0, 100);
 
                 return $cappedDelay + $jitterMs;
