@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Entity\Packaging;
 use App\Entity\CachedPackaging;
+use App\Services\Exception\ApiErrorException;
 use App\Services\Exception\InvalidParameterException;
 use App\Services\Exception\NoAppropriatePackagingFoundException;
 use App\Services\Exception\NoPackagingInDatabaseException;
@@ -50,7 +51,25 @@ class PackingService
             $binData = json_decode($cached->responseBody, true);
             $binData = is_array($binData) ? $binData : [];
         } else {
-            $binData = $this->getFromApiWithFallback($items, $requestHash, 'miss');
+            try {
+                $binData = $this->getFromApiAndCacheResponse($items, $requestHash, 'miss');
+            } catch (UnexpectedApiResponseFormatException | ApiErrorException $e) {
+                $this->logger->warning('API fail, using local fallback', [
+                    ...$this->buildApiLogContext($items, $requestHash, 'miss'),
+                    'exception' => $e,
+                ]);
+
+                $box = $this->determineOptimalPackagingLocally(
+                    $this->getAvailablePackaging(),
+                    $items
+                );
+
+                if ($box !== null) {
+                    return $box;
+                } else {
+                    throw new NoAppropriatePackagingFoundException();
+                }
+            }
         }
 
         $packingFromDb = null;
@@ -63,7 +82,25 @@ class PackingService
                     $this->entityManager->flush();
                 }
 
-                $binData = $this->getFromApiWithFallback($items, $requestHash, 'stale_cache_refresh'); // load new packaging
+                try {
+                    $binData = $this->getFromApiAndCacheResponse($items, $requestHash, 'stale_cache_refresh'); // load new packaging
+                } catch (UnexpectedApiResponseFormatException | ApiErrorException $e) {
+                    $this->logger->warning('API fail, using local fallback', [
+                        ...$this->buildApiLogContext($items, $requestHash, 'stale_cache_refresh'),
+                        'exception' => $e,
+                    ]);
+
+                    $box = $this->determineOptimalPackagingLocally(
+                        $this->getAvailablePackaging(),
+                        $items
+                    );
+
+                    if ($box !== null) {
+                        return $box;
+                    } else {
+                        throw new NoAppropriatePackagingFoundException();
+                    }
+                }
 
                 if ($binData !== []) {
                     /** @var array{id: int|string} $binData */
@@ -119,30 +156,13 @@ class PackingService
     /**
      * @param array<int, array{id: string, w: int, h: int, d: int, q: int, wg: int, vr: int}> $items
      * @return array<string, mixed>
-     * @throws NoPackagingInDatabaseException|NoAppropriatePackagingFoundException
-     */
-    private function getFromApiWithFallback(array $items, string $requestHash, string $cacheContext): array
-    {
-        try {
-            return $this->getFromApiAndCacheResponse($items, $requestHash, $cacheContext);
-        } catch (UnexpectedApiResponseFormatException $e) {
-            $this->logger->warning('API response format unexpected, using local fallback', [
-                ...$this->buildApiLogContext($items, $requestHash, $cacheContext),
-                'exception' => $e,
-            ]);
-            return [];
-        }
-    }
-
-    /**
-     * @param array<int, array{id: string, w: int, h: int, d: int, q: int, wg: int, vr: int}> $items
-     * @return array<string, mixed>
      * @throws NoPackagingInDatabaseException
      * @throws UnexpectedApiResponseFormatException|NoAppropriatePackagingFoundException
+     * @throws ApiErrorException
      */
     private function getFromApiAndCacheResponse(array $items, string $requestHash, string $cacheContext): array
     {
-        $endpoint = "$this->apiUrl/packer/packIntoMany";
+        $endpoint = "$this->apiUrl/packer/findBinSize";
 
         try {
             $response = $this->client->post($endpoint, [
@@ -158,7 +178,19 @@ class PackingService
             ]);
 
             if ($response->getStatusCode() === 200) {
-                $body = json_decode($response->getBody()->getContents(), true);
+                $responseBodyString = $response->getBody()->getContents();
+                $body = json_decode($responseBodyString, true);
+
+                // Log response body in test or dev environments
+                $env = $_ENV['APP_ENV'] ?? 'dev';
+                if ($env === 'test' || $env === 'dev') {
+                    $this->logger->debug('API response body', [
+                        ...$this->buildApiLogContext($items, $requestHash, $cacheContext),
+                        'endpoint' => $endpoint,
+                        'response_body' => $responseBodyString,
+                    ]);
+                }
+
                 if (!is_array($body)) {
                     throw new UnexpectedApiResponseFormatException('Response body is not a valid JSON object');
                 }
@@ -172,6 +204,8 @@ class PackingService
                         'api_status' => $diagnostics['api_status'],
                         'api_errors' => $diagnostics['api_errors'],
                     ]);
+
+                    throw new ApiErrorException('Third party API returned error');
                 }
 
                 if (
