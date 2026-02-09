@@ -18,6 +18,6 @@ return [
         'paths' => [
             __DIR__ . '/../src/Entity',
         ],
-        'is_dev_mode' => ($_ENV['APP_ENV'] ?? 'development') !== 'production',
+        'is_dev_mode' => ($_ENV['APP_ENV'] ?? 'prod') !== 'prod',
     ],
 ];

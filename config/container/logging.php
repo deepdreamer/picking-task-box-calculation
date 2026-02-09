@@ -10,14 +10,16 @@ use Psr\Log\LoggerInterface;
 return [
     LoggerInterface::class => function () {
         $env = $_ENV['APP_ENV'] ?? 'dev';
-        $isProd = $env === 'prod';
+        $env = is_string($env) ? strtolower($env) : 'dev';
 
         $logger = new Logger('packing-service');
-        $logFile = $isProd
-            ? __DIR__ . '/../../logs/production.log'
-            : __DIR__ . '/../../logs/dev.log';
+        $logFile = match ($env) {
+            'prod' => __DIR__ . '/../../logs/prod.log',
+            'test' => __DIR__ . '/../../logs/test.log',
+            default => __DIR__ . '/../../logs/dev.log',
+        };
 
-        $minLevel = $isProd ? Level::Error : Level::Debug;
+        $minLevel = $env === 'prod' ? Level::Error : Level::Debug;
         $logger->pushHandler(new StreamHandler($logFile, $minLevel));
 
         return $logger;

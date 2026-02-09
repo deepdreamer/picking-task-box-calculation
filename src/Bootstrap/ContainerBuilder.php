@@ -15,8 +15,6 @@ class ContainerBuilder
 
         // Load container definitions
         $builder->addDefinitions(__DIR__ . '/../../config/container.php');
-//        $builder->addDefinitions(__DIR__ . '/../../src/Container/Services.php');
-//        $builder->addDefinitions(__DIR__ . '/../../src/Container/Repositories.php');
 
         return $builder->build();
     }
