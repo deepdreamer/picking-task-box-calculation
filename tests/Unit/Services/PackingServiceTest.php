@@ -11,7 +11,10 @@ use App\Repository\PackagingRepository;
 use App\Services\Exception\NoAppropriatePackagingFoundException;
 use App\Services\Exception\NoPackagingInDatabaseException;
 use App\Services\LocalPackagingCalculator;
+use App\Services\PackingApiClient;
+use App\Services\PackingCache;
 use App\Services\PackingService;
+use App\Services\ProductNormalizer;
 use Doctrine\ORM\EntityManager;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -24,6 +27,14 @@ use Psr\Http\Message\StreamInterface;
 
 class PackingServiceTest extends TestCase
 {
+    private ProductNormalizer $productNormalizer;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->productNormalizer = new ProductNormalizer();
+    }
+
     public function testGetOptimalBoxReturnsCachedResultWhenCacheHit(): void
     {
         // Given
@@ -47,10 +58,7 @@ class PackingServiceTest extends TestCase
         $this->thenRequestToApiWillNotBeMade($client);
         $this->thenPackagingWillBeLoadedFromDb($packagingRepository, $givenCachedBinId, $givenExpectedPackaging);
 
-        $packingService = new PackingService(
-            'api-url-test',
-            'api-key-test',
-            'username-test',
+        $packingService = $this->givenPackingService(
             $client,
             $packagingRepository,
             $logger,
@@ -100,10 +108,7 @@ class PackingServiceTest extends TestCase
         );
         $this->thenPackagingWillBeLoadedFromDb($packagingRepository, $givenBinId, $givenExpectedPackaging);
 
-        $packingService = new PackingService(
-            'api-url-test',
-            'api-key-test',
-            'username-test',
+        $packingService = $this->givenPackingService(
             $client,
             $packagingRepository,
             $logger,
@@ -152,10 +157,7 @@ class PackingServiceTest extends TestCase
         );
         $this->thenPackagingWillBeLoadedFromDb($packagingRepository, $givenBinId, $givenExpectedPackaging);
 
-        $packingService = new PackingService(
-            'api-url-test',
-            'api-key-test',
-            'username-test',
+        $packingService = $this->givenPackingService(
             $client,
             $packagingRepository,
             $logger,
@@ -211,10 +213,7 @@ class PackingServiceTest extends TestCase
 
         $this->thenNoWriteToDatabase($entityManager);
 
-        $packingService = new PackingService(
-            'api-url-test',
-            'api-key-test',
-            'username-test',
+        $packingService = $this->givenPackingService(
             $client,
             $packagingRepository,
             $logger,
@@ -253,10 +252,7 @@ class PackingServiceTest extends TestCase
 
         $this->thenNoWriteToDatabase($entityManager);
 
-        $packingService = new PackingService(
-            'api-url-test',
-            'api-key-test',
-            'username-test',
+        $packingService = $this->givenPackingService(
             $client,
             $packagingRepository,
             $logger,
@@ -301,10 +297,7 @@ class PackingServiceTest extends TestCase
         );
         $this->thenLocalCalculationWillNotBeUsed($localPackagingCalculator);
 
-        $packingService = new PackingService(
-            'api-url-test',
-            'api-key-test',
-            'username-test',
+        $packingService = $this->givenPackingService(
             $client,
             $packagingRepository,
             $logger,
@@ -343,10 +336,7 @@ class PackingServiceTest extends TestCase
         $this->thenLocalCalculationWillBeUsedAndFail($localPackagingCalculator, $expectedBins, $expectedItems);
         $this->thenNoWriteToDatabase($entityManager);
 
-        $packingService = new PackingService(
-            'api-url-test',
-            'api-key-test',
-            'username-test',
+        $packingService = $this->givenPackingService(
             $client,
             $packagingRepository,
             $logger,
@@ -454,10 +444,7 @@ class PackingServiceTest extends TestCase
             $refreshedBinId
         );
 
-        $packingService = new PackingService(
-            'api-url-test',
-            'api-key-test',
-            'username-test',
+        $packingService = $this->givenPackingService(
             $client,
             $packagingRepository,
             $logger,
@@ -562,7 +549,32 @@ class PackingServiceTest extends TestCase
      */
     private function buildExpectedRequestHash(array $products): string
     {
-        return PackingService::buildRequestHash($products);
+        return $this->productNormalizer->buildRequestHash($products);
+    }
+
+    private function givenPackingService(
+        Client $client,
+        PackagingRepository $packagingRepository,
+        Logger $logger,
+        CachedPackagingRepository $cachedPackagingRepository,
+        EntityManager $entityManager,
+        LocalPackagingCalculator $localPackagingCalculator
+    ): PackingService {
+        return new PackingService(
+            $packagingRepository,
+            $logger,
+            $localPackagingCalculator,
+            $this->productNormalizer,
+            new PackingApiClient(
+                'api-url-test',
+                'api-key-test',
+                'username-test',
+                'test',
+                $client,
+                $logger
+            ),
+            new PackingCache($cachedPackagingRepository, $entityManager)
+        );
     }
 
     private function whenPackagingIsNotCached(
@@ -884,8 +896,8 @@ class PackingServiceTest extends TestCase
     private function whenRequestHashesAreCalculated(array $context): array
     {
         return [
-            'first_hash' => PackingService::buildRequestHash($context['products_in_first_order']),
-            'second_hash' => PackingService::buildRequestHash($context['products_in_second_order']),
+            'first_hash' => $this->productNormalizer->buildRequestHash($context['products_in_first_order']),
+            'second_hash' => $this->productNormalizer->buildRequestHash($context['products_in_second_order']),
         ];
     }
 

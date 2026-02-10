@@ -69,14 +69,8 @@ return [
         $em = $container->get(EntityManager::class);
         /** @var PackagingRepository $packagingRepo */
         $packagingRepo = $em->getRepository(Packaging::class);
-        /** @var Client $client */
-        $client = $container->get(Client::class);
         /** @var LoggerInterface $logger */
         $logger = $container->get(LoggerInterface::class);
-        /** @var CachedPackagingRepository $cacheRepo */
-        $cacheRepo = $container->get(CachedPackagingRepository::class);
-        /** @var EntityManagerInterface $entityManager */
-        $entityManager = $container->get(EntityManagerInterface::class);
         /** @var LocalPackagingCalculator $localCalc */
         $localCalc = $container->get(LocalPackagingCalculator::class);
         /** @var ProductNormalizer $productNormalizer */
@@ -85,21 +79,9 @@ return [
         $packingApiClient = $container->get(PackingApiClient::class);
         /** @var PackingCache $packingCache */
         $packingCache = $container->get(PackingCache::class);
-        $apiUrl = $_ENV['API_URL'] ?? '';
-        $apiKey = $_ENV['API_KEY'] ?? '';
-        $apiUsername = $_ENV['API_USERNAME'] ?? '';
-        $apiUrl = is_string($apiUrl) ? $apiUrl : '';
-        $apiKey = is_string($apiKey) ? $apiKey : '';
-        $apiUsername = is_string($apiUsername) ? $apiUsername : '';
         return new PackingService(
-            $apiUrl,
-            $apiKey,
-            $apiUsername,
-            $client,
             $packagingRepo,
             $logger,
-            $cacheRepo,
-            $entityManager,
             $localCalc,
             $productNormalizer,
             $packingApiClient,

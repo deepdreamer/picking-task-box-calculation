@@ -5,52 +5,24 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Entity\Packaging;
-use App\Repository\CachedPackagingRepository;
 use App\Repository\PackagingRepository;
 use App\Services\Exception\ApiErrorException;
 use App\Services\Exception\InvalidParameterException;
 use App\Services\Exception\NoAppropriatePackagingFoundException;
 use App\Services\Exception\NoPackagingInDatabaseException;
 use App\Services\Exception\UnexpectedApiResponseFormatException;
-use Doctrine\ORM\EntityManagerInterface;
-use GuzzleHttp\Client;
 use Psr\Log\LoggerInterface;
 
 class PackingService
 {
-    private ProductNormalizer $productNormalizer;
-
-    private PackingApiClient $packingApiClient;
-
-    private PackingCache $packingCache;
-
     public function __construct(
-        private string $apiUrl,
-        private string $apiKey,
-        private string $username,
-        private Client $client,
         private PackagingRepository $packagingRepository,
         private LoggerInterface $logger,
-        private CachedPackagingRepository $cachedPackagingRepository,
-        private EntityManagerInterface $entityManager,
         private LocalPackagingCalculator $localPackagingCalculator,
-        ?ProductNormalizer $productNormalizer = null,
-        ?PackingApiClient $packingApiClient = null,
-        ?PackingCache $packingCache = null,
+        private ProductNormalizer $productNormalizer,
+        private PackingApiClient $packingApiClient,
+        private PackingCache $packingCache,
     ) {
-        $this->productNormalizer = $productNormalizer ?? new ProductNormalizer();
-        $this->packingApiClient = $packingApiClient ?? new PackingApiClient(
-            $this->apiUrl,
-            $this->apiKey,
-            $this->username,
-            $this->resolveAppEnv(),
-            $this->client,
-            $this->logger,
-        );
-        $this->packingCache = $packingCache ?? new PackingCache(
-            $this->cachedPackagingRepository,
-            $this->entityManager,
-        );
     }
 
     /**
@@ -66,26 +38,19 @@ class PackingService
 
         $items = $this->productNormalizer->normalizeProducts($products);
         $requestHash = $this->productNormalizer->buildRequestHash($products);
-
         /** @var list<array{id: string, h: float, w: float, d: float, max_wg: float, q: int, type: string}>|null $availablePackaging */
         $availablePackaging = null;
-        /** @var \Closure():list<array{id: string, h: float, w: float, d: float, max_wg: float, q: int, type: string}> $getAvailablePackaging */
-        $getAvailablePackaging = function () use (&$availablePackaging): array {
-            if ($availablePackaging === null) {
-                $availablePackaging = $this->getAvailablePackaging();
-            }
-
-            return $availablePackaging;
-        };
 
         $cached = $this->packingCache->findByRequestHash($requestHash);
         $binData = $cached !== null ? $this->packingCache->decodeBinData($cached) : [];
 
         if ($cached === null) {
+            $availablePackaging = $this->getAvailablePackaging();
+
             try {
-                $binData = $this->getFromApiAndCacheResponse($items, $requestHash, 'miss', $getAvailablePackaging());
+                $binData = $this->getFromApiAndCacheResponse($items, $requestHash, 'miss', $availablePackaging);
             } catch (UnexpectedApiResponseFormatException | ApiErrorException $e) {
-                return $this->resolveLocalFallbackOrThrow($getAvailablePackaging(), $items, $requestHash, 'miss', $e);
+                return $this->resolveLocalFallbackOrThrow($availablePackaging, $items, $requestHash, 'miss', $e);
             }
         }
 
@@ -97,17 +62,18 @@ class PackingService
 
             if ($cached !== null) {
                 $this->packingCache->invalidate($cached);
+                $availablePackaging = $this->getAvailablePackaging();
 
                 try {
                     $binData = $this->getFromApiAndCacheResponse(
                         $items,
                         $requestHash,
                         'stale_cache_refresh',
-                        $getAvailablePackaging()
+                        $availablePackaging
                     );
                 } catch (UnexpectedApiResponseFormatException | ApiErrorException $e) {
                     return $this->resolveLocalFallbackOrThrow(
-                        $getAvailablePackaging(),
+                        $availablePackaging,
                         $items,
                         $requestHash,
                         'stale_cache_refresh',
@@ -124,20 +90,16 @@ class PackingService
             }
         }
 
-        $packingFromDb = $this->determineOptimalPackagingLocally($getAvailablePackaging(), $items);
+        if ($availablePackaging === null) {
+            $availablePackaging = $this->getAvailablePackaging();
+        }
+
+        $packingFromDb = $this->determineOptimalPackagingLocally($availablePackaging, $items);
         if ($packingFromDb !== null) {
             return $packingFromDb;
         }
 
         throw new NoAppropriatePackagingFoundException();
-    }
-
-    /**
-     * @param list<array{width: int|float, height: int|float, length: int|float, weight: int|float}> $products
-     */
-    public static function buildRequestHash(array $products): string
-    {
-        return (new ProductNormalizer())->buildRequestHash($products);
     }
 
     /**
@@ -183,6 +145,7 @@ class PackingService
     /**
      * @param list<array{id: string, h: float, w: float, d: float, max_wg: float, q: int, type: string}> $availablePackaging
      * @param array<int, array{id: string, w: int, h: int, d: int, q: int, wg: int, vr: int}> $items
+     * @throws NoAppropriatePackagingFoundException
      */
     private function resolveLocalFallbackOrThrow(
         array $availablePackaging,
@@ -265,12 +228,5 @@ class PackingService
         $packaging = $this->packagingRepository->find($binData['id']);
 
         return $packaging;
-    }
-
-    private function resolveAppEnv(): string
-    {
-        $env = $_ENV['APP_ENV'] ?? 'dev';
-
-        return is_string($env) ? $env : 'dev';
     }
 }
